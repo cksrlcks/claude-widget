@@ -57,6 +57,27 @@ src-tauri/src/              # 백엔드 (Rust)
 
 백엔드 상태는 Rust가 `state` / `catalog` 이벤트로 보내고, 화면은 React Query 캐시로 받습니다.
 
+## 배포 (자동 업데이트)
+
+v1.2.0부터 앱이 GitHub Release의 `latest.json`을 보고 스스로 업데이트합니다. 업데이트 파일은 서명 키로 서명해야 합니다.
+
+1. `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`의 버전을 올린다
+2. 서명 빌드 — 개인 키(`%USERPROFILE%\.tauri\claude-widget.key`) 비밀번호를 물어봄
+
+   ```bash
+   powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
+   ```
+
+3. 배포 파일 준비 → `release/<버전>/`에 설치 파일과 `latest.json` 생성
+
+   ```bash
+   node scripts/make-latest-json.cjs "릴리스 노트"
+   ```
+
+4. 두 파일을 GitHub Release `v<버전>`에 올린다 (Latest로 지정)
+
+개인 키를 잃어버리면 이미 설치된 앱에 더 이상 업데이트를 보낼 수 없으니 따로 백업해 둔다.
+
 ## 조작
 
 | 동작 | 결과 |
