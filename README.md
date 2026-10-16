@@ -13,16 +13,19 @@ Windows 화면 오른쪽에 떠 있는 Claude Code 상태 위젯.
 ## 실행
 
 [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI(`claude`)가 PATH에 있어야 합니다.
+[Tauri](https://tauri.app) 2로 만들어져 Windows 내장 WebView2를 씁니다 (설치 파일 약 2MB).
+
+개발에는 Rust(rustup)와 Visual Studio Build Tools(C++)가 필요합니다.
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
-빌드 (`dist/`에 설치 파일과 포터블 exe 생성):
+빌드 (`src-tauri/target/release/bundle/nsis/`에 설치 파일 생성):
 
 ```bash
-npm run dist
+npm run build
 ```
 
 ## 조작
@@ -55,6 +58,6 @@ Claude 데스크톱 앱의 로그인은 별개라 바뀌지 않는다.
 ## 데이터
 
 - `%APPDATA%/claude-widget/store.json` — 프로필 메타, 감시 목록, 위치
-- `%APPDATA%/claude-widget/secrets/*.bin` — 계정 토큰 (Windows DPAPI 암호화)
+- `%APPDATA%/claude-widget/secrets/*.dpapi` — 계정 토큰 (Windows DPAPI 암호화). 이전 Electron 버전의 `*.bin`은 첫 실행 때 자동으로 옮겨진다
 
 아이콘은 `npm run icons`로 다시 생성합니다 ([scripts/make-icons.js](scripts/make-icons.js)).

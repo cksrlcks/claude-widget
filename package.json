@@ -1,47 +1,17 @@
 {
   "name": "claude-widget",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Claude 계정/사용량/MCP 상태 플로팅 위젯",
-  "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
-    "icons": "node scripts/make-icons.js",
-    "dist": "electron-builder --win"
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "node scripts/make-icons.js"
   },
   "author": "chanki",
   "license": "ISC",
   "type": "commonjs",
-  "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
-  },
   "private": true,
-  "productName": "Claude Widget",
-  "build": {
-    "appId": "com.chanki.claude-widget",
-    "productName": "Claude Widget",
-    "files": [
-      "src/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "icon": "assets/icon.ico",
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Claude Widget"
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-portable.exe"
-    }
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3"
   }
 }

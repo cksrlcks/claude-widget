@@ -36,7 +36,7 @@ function setMeter(key, win, source) {
 let lastHeight = 0
 function fitHeight() {
   if (document.body.classList.contains("mini")) return
-  const h = Math.ceil($("card").getBoundingClientRect().height) + 12
+  const h = Math.ceil($("card").getBoundingClientRect().height)
   if (h !== lastHeight) {
     lastHeight = h
     window.api.setHeight(h)
@@ -102,24 +102,21 @@ function render(s) {
   requestAnimationFrame(fitHeight)
 }
 
-// 드래그(창 이동)와 클릭 구분
+// 드래그(창 이동)와 클릭 구분: 3px 넘게 움직이면 OS 창 드래그로 넘김 (위치 저장은 백엔드가 처리)
 let down = null
 document.addEventListener("mousedown", (e) => {
   if (e.button !== 0 || e.target.closest("button")) return
-  down = { x: e.screenX, y: e.screenY, moved: false, target: e.target }
-  window.api.dragStart({ x: e.screenX, y: e.screenY })
+  down = { x: e.screenX, y: e.screenY, target: e.target }
 })
 document.addEventListener("mousemove", (e) => {
-  if (!down) return
-  if (Math.abs(e.screenX - down.x) + Math.abs(e.screenY - down.y) > 3) down.moved = true
-  if (down.moved) window.api.dragMove({ x: e.screenX, y: e.screenY })
+  if (!down || Math.abs(e.screenX - down.x) + Math.abs(e.screenY - down.y) <= 3) return
+  down = null
+  window.api.startDrag()
 })
 document.addEventListener("mouseup", () => {
   if (!down) return
-  const { moved, target } = down
+  const { target } = down
   down = null
-  window.api.dragEnd()
-  if (moved) return
   const login = target.closest("[data-login]")
   if (login) return window.api.mcpLogin([login.dataset.login])
   if (target.closest("[data-connectors]")) return window.api.openConnectors()
