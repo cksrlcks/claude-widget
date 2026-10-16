@@ -1,0 +1,100 @@
+:root {
+  --bg: rgba(22, 23, 26, 0.95);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #ececee;
+  --muted: #9a9ca3;
+  --accent: #5b8def;
+  --ok: #4fd18b;
+  --warn: #f2b84b;
+  --bad: #f2667a;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { background: transparent; overflow: hidden; user-select: none; }
+body { font: 12px/1.4 "Segoe UI", "Malgun Gothic", sans-serif; color: var(--text); padding: 6px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}
+body.mini .card { display: none; }
+
+/* 헤더: 아바타 · 이름/이메일 · 설정 */
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; overflow: hidden; flex: none; cursor: pointer; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08); }
+.avatar svg, .avatar img, .bubble-avatar svg, .bubble-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.who { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.email { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon { width: 28px; height: 28px; margin-right: -4px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.icon:hover { background: var(--surface-hover); color: var(--text); }
+.icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+/* 사용량 막대 */
+.meter + .meter { margin-top: 12px; }
+.row { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 11.5px; }
+.row b { color: var(--text); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin-top: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--ok); transition: width 0.4s, background 0.4s; }
+.sub { color: var(--muted); font-size: 10.5px; margin-top: 4px; min-height: 14px; }
+
+/* MCP 상태 */
+.mcp {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+  font-size: 12px;
+}
+.mcp:hover { background: var(--surface-hover); }
+.mcp.bad { background: rgba(242, 102, 122, 0.14); color: #ffd3da; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(79, 209, 139, 0.15); }
+.dot.bad { background: var(--bad); box-shadow: 0 0 0 3px rgba(242, 102, 122, 0.18); }
+.dot.checking { background: var(--warn); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+
+.mcp-list { margin-top: 6px; display: grid; gap: 2px; }
+.mcp-list:empty { display: none; }
+.mcp-list div { font-size: 11px; color: #f7b4bf; padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 7px; }
+.mcp-list div.act, .mcp-list div.more { cursor: pointer; }
+.mcp-list div.act:hover, .mcp-list div.more:hover { background: var(--surface-hover); color: #fff; }
+.mcp-list div.more { color: var(--muted); }
+.mcp-list .kind { font-size: 10px; padding: 1px 5px; margin: 0 2px; border-radius: 4px; background: rgba(255, 255, 255, 0.09); color: var(--muted); }
+
+/* 미니 모드: 아바타 + 세션 사용량 링 + 끊김 뱃지 */
+.bubble { display: none; position: relative; width: 64px; height: 64px; cursor: grab; }
+body.mini .bubble { display: block; }
+.ring { position: absolute; inset: 0; width: 64px; height: 64px; transform: rotate(-90deg); }
+.ring-bg { fill: rgb(22, 23, 26); stroke: rgba(255, 255, 255, 0.12); stroke-width: 5; }
+.ring-fg { fill: none; stroke: var(--ok); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 213.6; stroke-dashoffset: 213.6; transition: stroke-dashoffset 0.4s; }
+.bubble-avatar { position: absolute; inset: 8px; border-radius: 50%; overflow: hidden; }
+.badge {
+  display: none;
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--bad);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  border: 2px solid rgb(22, 23, 26);
+}
+.badge.show { display: block; }

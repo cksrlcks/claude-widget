@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'" />
+    <link rel="stylesheet" href="widget.css" />
+  </head>
+  <body>
+    <div id="card" class="card">
+      <div class="head">
+        <div id="avatar" class="avatar"></div>
+        <div class="who">
+          <div id="name" class="name">-</div>
+          <div id="email" class="email">불러오는 중…</div>
+        </div>
+        <button id="btn-settings" class="icon" title="설정 / 계정 전환">
+          <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
+        </button>
+      </div>
+
+      <div class="meter">
+        <div class="row"><span>세션 (5시간) 사용</span><b id="session-val">-</b></div>
+        <div class="bar"><i id="session-bar"></i></div>
+        <div id="session-reset" class="sub"></div>
+      </div>
+      <div class="meter">
+        <div class="row"><span>주간 사용</span><b id="weekly-val">-</b></div>
+        <div class="bar"><i id="weekly-bar"></i></div>
+        <div id="weekly-reset" class="sub"></div>
+      </div>
+
+      <button id="mcp" class="mcp" title="클릭해서 다시 확인">
+        <span id="mcp-dot" class="dot"></span>
+        <span id="mcp-text">MCP 확인 중…</span>
+      </button>
+      <div id="mcp-list" class="mcp-list"></div>
+    </div>
+
+    <div id="bubble" class="bubble">
+      <svg class="ring" viewBox="0 0 76 76"><circle cx="38" cy="38" r="34" class="ring-bg" /><circle id="ring" cx="38" cy="38" r="34" class="ring-fg" /></svg>
+      <div id="bubble-avatar" class="bubble-avatar"></div>
+      <span id="badge" class="badge"></span>
+    </div>
+
+    <script src="avatars.js"></script>
+    <script src="widget.js"></script>
+  </body>
+</html>

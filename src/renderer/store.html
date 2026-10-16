@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'" />
+    <title>플러그인 스토어</title>
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="stylesheet" href="store.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <input id="q" type="search" placeholder="플러그인 검색 (이름·설명)" />
+      <select id="market"></select>
+      <button id="reload" class="btn">새로고침</button>
+      <button id="btn-markets" class="btn">마켓플레이스 관리</button>
+    </header>
+    <section id="markets" class="markets" hidden>
+      <form id="add-form" class="add-row">
+        <input id="add-src" placeholder="GitHub owner/repo 또는 https 주소 (예: DietrichGebert/ponytail)" autocomplete="off" />
+        <button id="add-btn" class="btn primary" type="submit">추가</button>
+      </form>
+      <div id="add-msg" class="add-msg"></div>
+      <div id="market-list" class="market-list"></div>
+    </section>
+    <div class="tabs">
+      <button class="tab on" data-tab="all">전체 <span id="c-all"></span></button>
+      <button class="tab" data-tab="installed">설치됨 <span id="c-installed"></span></button>
+      <span id="status" class="status"></span>
+    </div>
+    <main id="list" class="list"></main>
+    <script src="store.js"></script>
+  </body>
+</html>

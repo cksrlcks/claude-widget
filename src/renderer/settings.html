@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'" />
+    <title>Claude 위젯 설정</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <section>
+      <div class="sec-head">
+        <h2>계정</h2>
+        <button id="btn-login" class="btn">+ 다른 계정 로그인</button>
+      </div>
+      <div id="profiles" class="profiles"></div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>감시할 MCP · 플러그인</h2>
+        <button id="btn-check" class="btn">지금 확인</button>
+      </div>
+      <p class="hint" id="check-info"></p>
+      <div class="watch-tools">
+        <label><input type="checkbox" id="watch-all" /> 전체 감시 (새로 추가되는 항목 포함)</label>
+      </div>
+      <div id="watch" class="watch"></div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>설치된 스킬 · 플러그인</h2>
+        <button id="btn-store" class="btn">플러그인 스토어 열기</button>
+      </div>
+      <div id="inventory" class="inventory"></div>
+    </section>
+
+    <section>
+      <h2>일반</h2>
+      <label class="line">MCP 자동 확인 간격 <input id="interval" type="number" min="1" max="120" /> 분</label>
+      <label class="line"><input type="checkbox" id="autostart" /> Windows 시작 시 자동 실행</label>
+    </section>
+
+    <input id="file" type="file" accept="image/*" hidden />
+    <script src="avatars.js"></script>
+    <script src="settings.js"></script>
+  </body>
+</html>

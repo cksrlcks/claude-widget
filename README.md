@@ -1,0 +1,60 @@
+# Claude Widget
+
+Windows 화면 오른쪽에 떠 있는 Claude Code 상태 위젯.
+
+> 비공식 개인 프로젝트입니다. Anthropic과 관련이 없습니다.
+
+- 현재 로그인 계정 + 아바타(기본 5종 / 내 이미지)
+- 세션(5시간)·주간 사용량 %
+- 감시 중인 MCP·플러그인 중 끊어진 개수, 클릭으로 MCP 로그인
+- 계정 전환 (MCP·플러그인·settings는 그대로, 계정 정보만 교체)
+- 설치된 스킬·플러그인 목록, 플러그인 스토어(마켓플레이스 추가·설치·제거)
+
+## 실행
+
+[Claude Code](https://docs.claude.com/en/docs/claude-code) CLI(`claude`)가 PATH에 있어야 합니다.
+
+```bash
+npm install
+npm start
+```
+
+빌드 (`dist/`에 설치 파일과 포터블 exe 생성):
+
+```bash
+npm run dist
+```
+
+## 조작
+
+| 동작 | 결과 |
+| --- | --- |
+| 드래그 | 위치 이동 (위치 기억) |
+| 아바타 클릭 | 미니 모드(아바타 + 사용량 링 + 끊김 뱃지) ↔ 확장 |
+| 우클릭 | 계정 빠른 전환, 플러그인 스토어, 설정 |
+| MCP 영역 클릭 | 즉시 다시 확인 |
+| 끊김 항목 클릭 | `claude mcp login` 실행 |
+| 트레이 아이콘 | 보이기/숨기기, 전환, 종료 |
+
+## 계정 추가 / 전환
+
+1. 현재 로그인한 계정은 자동 저장된다.
+2. 설정 → “다른 계정 로그인” → 터미널에서 `claude auth login` 완료 → 자동 등록.
+3. 이후 설정이나 우클릭 메뉴에서 전환.
+
+전환 시 바뀌는 것: `~/.claude/.credentials.json`의 `claudeAiOauth`·`organizationUuid`, `~/.claude.json`의 `oauthAccount`.
+그 외(MCP 설정, mcpOAuth, projects, settings.json 등)는 건드리지 않는다. 전환 직전 두 파일은 `%APPDATA%/claude-widget/backups`에 백업된다.
+이미 실행 중인 Claude Code 세션은 재시작해야 새 계정이 적용된다.
+Claude 데스크톱 앱의 로그인은 별개라 바뀌지 않는다.
+
+## 주의
+
+- 로그인 정보 파일을 직접 수정합니다. 자동 백업은 하지만 사용은 본인 책임입니다.
+- 사용량은 Claude Code가 내부적으로 쓰는 비공개 API(`/api/oauth/usage`)로 가져옵니다. 예고 없이 바뀌거나 막힐 수 있습니다.
+
+## 데이터
+
+- `%APPDATA%/claude-widget/store.json` — 프로필 메타, 감시 목록, 위치
+- `%APPDATA%/claude-widget/secrets/*.bin` — 계정 토큰 (Windows DPAPI 암호화)
+
+아이콘은 `npm run icons`로 다시 생성합니다 ([scripts/make-icons.js](scripts/make-icons.js)).
