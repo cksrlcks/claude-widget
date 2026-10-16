@@ -3,6 +3,7 @@
 mod claude;
 mod crypto;
 mod store;
+mod updates;
 
 use serde_json::{json, Value};
 use std::sync::{
@@ -44,6 +45,7 @@ struct AppState {
     rt: Mutex<Runtime>,
     catalog: Mutex<Value>,
     move_gen: AtomicU64,
+    update: Mutex<updates::UpdateState>,
 }
 
 fn state(app: &AppHandle) -> tauri::State<'_, AppState> {
@@ -128,6 +130,7 @@ fn build_state(app: &AppHandle) -> Value {
         "mcpIntervalMin": s.mcp_interval_min,
         "autoStart": app.autolaunch().is_enabled().unwrap_or(false),
         "mini": rt.mini,
+        "update": st.update.lock().unwrap().to_json(&app.package_info().version.to_string()),
     })
 }
 
@@ -542,6 +545,11 @@ fn build_menu(app: &AppHandle, s: &Value, for_tray: bool) -> tauri::Result<Menu<
     menu.append(&MenuItem::with_id(app, "recheck", "MCP 상태 다시 확인", true, None::<&str>)?)?;
     menu.append(&MenuItem::with_id(app, "store", "플러그인 스토어", true, None::<&str>)?)?;
     menu.append(&MenuItem::with_id(app, "settings", "설정", true, None::<&str>)?)?;
+    let update_label = match s["update"]["available"]["version"].as_str() {
+        Some(v) => format!("v{v}로 업데이트"),
+        None => "업데이트 확인".to_string(),
+    };
+    menu.append(&MenuItem::with_id(app, "update", update_label, true, None::<&str>)?)?;
     if !for_tray {
         menu.append(&MenuItem::with_id(app, "hide", "위젯 숨기기 (트레이에서 다시 열기)", true, None::<&str>)?)?;
     }
@@ -569,6 +577,17 @@ fn handle_menu(app: &AppHandle, id: &str) {
             }
         }
         "quit" => app.exit(0),
+        "update" => {
+            let has_update = state(app).update.lock().unwrap().available.is_some();
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if has_update {
+                    updates::install(app).await
+                } else {
+                    updates::check(app).await
+                }
+            });
+        }
         other => {
             if let Some(acc) = other.strip_prefix("switch:") {
                 switch_account(app, acc.to_string());
@@ -754,6 +773,16 @@ fn set_height(app: AppHandle, h: f64) {
 }
 
 #[tauri::command]
+async fn check_update_cmd(app: AppHandle) {
+    updates::check(app).await;
+}
+
+#[tauri::command]
+async fn install_update_cmd(app: AppHandle) {
+    updates::install(app).await;
+}
+
+#[tauri::command]
 fn account_menu(app: AppHandle) {
     let s = build_state(&app);
     if let (Some(w), Ok(menu)) = (widget(&app), build_menu(&app, &s, false)) {
@@ -816,6 +845,7 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState {
             store: Mutex::new(Store::load()),
             rt: Mutex::new(Runtime {
@@ -832,6 +862,7 @@ fn main() {
             }),
             catalog: Mutex::new(json!({ "items": [] })),
             move_gen: AtomicU64::new(0),
+            update: Mutex::new(updates::UpdateState::default()),
         })
         .invoke_handler(tauri::generate_handler![
             get_state,
@@ -857,6 +888,8 @@ fn main() {
             store_install,
             store_action,
             store_marketplace,
+            check_update_cmd,
+            install_update_cmd,
         ])
         .on_menu_event(|app, e| handle_menu(app, e.id().as_ref()))
         .setup(|app| {
@@ -875,6 +908,16 @@ fn main() {
                     }
                 })
                 .build(app)?;
+
+            // 업데이트: 시작 10초 뒤, 이후 6시간마다
+            let h = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(10)).await;
+                loop {
+                    updates::check(h.clone()).await;
+                    tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
+                }
+            });
 
             // 상태 1분, MCP 설정 간격, 최상위 유지 5초
             let h = handle.clone();

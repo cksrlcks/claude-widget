@@ -36,6 +36,19 @@ export type Integration = {
 
 export type Skill = { name: string; description: string }
 
+export type UpdateInfo = {
+  /** 지금 실행 중인 버전 */
+  current: string
+  /** 새 버전. null이면 최신 */
+  available: { version: string; notes: string | null; date: string | null } | null
+  checking: boolean
+  installing: boolean
+  /** 다운로드 진행률 0~100 */
+  progress: number | null
+  error: string | null
+  checkedAt: number | null
+}
+
 export type AppState = {
   profiles: Profile[]
   activeId: string | null
@@ -58,6 +71,7 @@ export type AppState = {
   mcpIntervalMin: number
   autoStart: boolean
   mini: boolean
+  update: UpdateInfo
 }
 
 export type CatalogItem = {

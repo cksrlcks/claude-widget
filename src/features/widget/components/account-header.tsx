@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react"
+import { ArrowUpCircle, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -9,10 +9,12 @@ import type { Profile } from "@/shared/types"
 type Props = {
   profile: Profile | undefined
   onAvatarClick: () => void
+  /** 새 버전이 있으면 그 버전 — 업데이트 아이콘 표시 */
+  updateVersion?: string
   className?: string
 }
 
-export function AccountHeader({ profile, onAvatarClick, className }: Props) {
+export function AccountHeader({ profile, onAvatarClick, updateVersion, className }: Props) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <button type="button" onClick={onAvatarClick} title="미니 모드" className="cursor-pointer">
@@ -26,6 +28,17 @@ export function AccountHeader({ profile, onAvatarClick, className }: Props) {
           {profile ? `${profile.email}${profile.plan ? ` · ${profile.plan}` : ""}` : "설정에서 로그인하세요"}
         </div>
       </div>
+      {updateVersion && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-primary"
+          title={`새 버전 v${updateVersion} — 설정에서 업데이트`}
+          onClick={() => api.openSettings()}
+        >
+          <ArrowUpCircle />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"

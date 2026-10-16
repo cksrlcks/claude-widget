@@ -32,6 +32,10 @@ export const api = {
   setInterval: (min: number) => invoke<void>("set_interval", { min }),
   setAutoStart: (on: boolean) => invoke<void>("set_auto_start", { on }),
 
+  // 앱 업데이트
+  checkUpdate: () => invoke<void>("check_update_cmd"),
+  installUpdate: () => invoke<void>("install_update_cmd"),
+
   // 플러그인 스토어
   getCatalog: () => invoke<Catalog>("store_catalog"),
   reloadCatalog: () => invoke<void>("store_reload"),

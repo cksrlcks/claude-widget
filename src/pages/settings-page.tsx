@@ -2,6 +2,7 @@ import { AccountSection } from "@/features/accounts/components/account-section"
 import { GeneralSection } from "@/features/general/components/general-section"
 import { WatchSection } from "@/features/integrations/components/watch-section"
 import { InventorySection } from "@/features/inventory/components/inventory-section"
+import { UpdateSection } from "@/features/updates/components/update-section"
 import { useAppState } from "@/shared/api/queries"
 
 export function SettingsPage() {
@@ -14,6 +15,7 @@ export function SettingsPage() {
       <WatchSection state={state} />
       <InventorySection state={state} />
       <GeneralSection state={state} />
+      <UpdateSection update={state.update} />
     </main>
   )
 }

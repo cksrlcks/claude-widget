@@ -36,7 +36,12 @@ export function WidgetPage() {
         />
       ) : (
         <div ref={cardRef} className="px-3.5 py-3">
-          <AccountHeader profile={profile} onAvatarClick={() => api.setMini(true)} className="mb-2.5" />
+          <AccountHeader
+            profile={profile}
+            onAvatarClick={() => api.setMini(true)}
+            updateVersion={s.update.available?.version}
+            className="mb-2.5"
+          />
           <UsageMeter
             label="세션 (5시간) 사용"
             window={s.usage?.session ?? null}
