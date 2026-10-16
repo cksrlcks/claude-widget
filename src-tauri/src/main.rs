@@ -402,11 +402,19 @@ fn place_widget(app: &AppHandle) {
     let (aw, ah) = (area.size.width as f64, area.size.height as f64);
     let (w_px, h_px) = if mini { (MINI * scale, MINI * scale) } else { (FULL_W * scale, full_h * scale) };
 
-    // 저장된 위치는 오른쪽 끝 기준 → 미니/확장 전환 시 오른쪽 정렬 유지. 화면 밖이면 안쪽으로 보정
+    // 저장된 위치는 "보이는 카드의 오른쪽 끝" 기준 → 미니/확장 전환 시 오른쪽 정렬 유지. 화면 밖이면 안쪽으로 보정
     let right = pos.as_ref().map(|p| p.right).unwrap_or(ax + aw - 16.0 * scale).clamp(ax + w_px, ax + aw);
     let y = pos.as_ref().map(|p| p.y).unwrap_or(ay + ah * 0.3).clamp(ay, (ay + ah - h_px).max(ay));
     let _ = w.set_size(PhysicalSize::new(w_px.round() as u32, h_px.round() as u32));
-    let _ = w.set_position(PhysicalPosition::new((right - w_px).round() as i32, y.round() as i32));
+    let _ = w.set_position(PhysicalPosition::new((right - w_px - frame_border(&w)).round() as i32, y.round() as i32));
+}
+
+/// Windows가 창 좌우에 두는 보이지 않는 테두리 폭(px). set_position은 이 테두리 바깥 기준이라 보정에 필요
+fn frame_border(w: &WebviewWindow) -> f64 {
+    match (w.outer_size(), w.inner_size()) {
+        (Ok(o), Ok(i)) => (o.width.saturating_sub(i.width) as f64) / 2.0,
+        _ => 0.0,
+    }
 }
 
 fn create_widget(app: &AppHandle) -> tauri::Result<()> {
@@ -438,10 +446,12 @@ fn create_widget(app: &AppHandle) -> tauri::Result<()> {
                     return;
                 }
                 let Some(w) = widget(&app) else { return };
-                let width = w.outer_size().map(|s| s.width as f64).unwrap_or(0.0);
+                // place_widget과 같은 기준(보이는 카드의 오른쪽 끝)으로 저장해야 전환할 때마다 위치가 밀리지 않음
+                let width = w.inner_size().map(|s| s.width as f64).unwrap_or(0.0);
+                let right = p.x as f64 + frame_border(&w) + width;
                 let st = state(&app);
                 let mut s = st.store.lock().unwrap();
-                s.position = Some(store::Position { right: p.x as f64 + width, y: p.y as f64 });
+                s.position = Some(store::Position { right, y: p.y as f64 });
                 s.save();
             });
         }

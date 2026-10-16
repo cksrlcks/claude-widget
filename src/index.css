@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* 앱은 다크 테마 하나만 사용 — shadcn 토큰을 차콜 배경 + 블루 강조로 매핑 */
+:root {
+  --background: #131417;
+  --foreground: #ececee;
+  --card: #1b1c20;
+  --card-foreground: #ececee;
+  --popover: #1b1c20;
+  --popover-foreground: #ececee;
+  --primary: #5b8def;
+  --primary-foreground: #ffffff;
+  --secondary: #23252a;
+  --secondary-foreground: #ececee;
+  --muted: #23252a;
+  --muted-foreground: #9a9ca3;
+  --accent: #2a2c32;
+  --accent-foreground: #ececee;
+  --destructive: #f2667a;
+  --border: #2d3036;
+  --input: #2d3036;
+  --ring: #5b8def;
+  --radius: 0.625rem;
+
+  /* 앱 전용 */
+  --widget: #16171a;
+  --border-strong: #41454e;
+  --success: #4fd18b;
+  --warning: #f2b84b;
+}
+
+@theme inline {
+  --font-sans: "Segoe UI", "Malgun Gothic", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-widget: var(--widget);
+  --color-border-strong: var(--border-strong);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply bg-background overflow-x-hidden;
+  }
+  /* 글자 크기는 body에만 — html에 걸면 rem 기준이 바뀌어 shadcn 컴포넌트 글자가 작아짐 */
+  body {
+    @apply text-foreground font-sans text-[13px] antialiased;
+  }
+  /* 얇은 스크롤바 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}

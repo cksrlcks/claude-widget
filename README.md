@@ -13,7 +13,7 @@ Windows 화면 오른쪽에 떠 있는 Claude Code 상태 위젯.
 ## 실행
 
 [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI(`claude`)가 PATH에 있어야 합니다.
-[Tauri](https://tauri.app) 2로 만들어져 Windows 내장 WebView2를 씁니다 (설치 파일 약 2MB).
+[Tauri](https://tauri.app) 2 + Vite + React로 만들어져 Windows 내장 WebView2를 씁니다 (설치 파일 약 2MB).
 
 개발에는 Rust(rustup)와 Visual Studio Build Tools(C++)가 필요합니다.
 
@@ -27,6 +27,35 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## 구조
+
+```
+src/                        # 화면 (Vite + React + TS, Tailwind, shadcn/ui)
+├── entries/                # 창별 진입점 (widget / settings / store)
+├── pages/                  # 창 하나 = 페이지 하나
+├── features/
+│   ├── widget/             # 위젯: 계정 헤더, 사용량 막대, MCP 상태, 미니 모드
+│   ├── accounts/           # 설정 > 계정 카드, 아바타 선택
+│   ├── integrations/       # 설정 > 감시할 MCP·플러그인
+│   ├── inventory/          # 설정 > 설치된 스킬·플러그인
+│   ├── general/            # 설정 > 일반
+│   └── store/              # 플러그인 스토어
+├── shared/
+│   ├── api/                # Tauri 명령(commands), Query 훅(queries), 액션(mutations)
+│   ├── components/         # 공용 컴포넌트 (아바타, 배지, 섹션)
+│   ├── lib/  hooks/        # 포맷 함수, 공용 훅
+│   └── types.ts            # 백엔드 JSON 타입
+├── components/ui/          # shadcn/ui
+└── hooks/use-confirm.tsx
+src-tauri/src/              # 백엔드 (Rust)
+├── main.rs                 # 창·트레이·메뉴, 프런트에서 부르는 명령
+├── claude.rs               # ~/.claude 읽기/쓰기, claude CLI 호출, 사용량 API
+├── store.rs                # store.json, 토큰 저장
+└── crypto.rs               # DPAPI 암호화, Electron 토큰 이전
+```
+
+백엔드 상태는 Rust가 `state` / `catalog` 이벤트로 보내고, 화면은 React Query 캐시로 받습니다.
 
 ## 조작
 
