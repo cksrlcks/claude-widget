@@ -606,7 +606,8 @@ fn update_tray(app: &AppHandle, s: &Value) {
         .to_string();
     let used = s["usage"]["session"]["used"].as_f64().map(|u| format!("{}%", u.round())).unwrap_or("-".into());
     let broken = s["integrations"]["broken"].as_array().map(|a| a.len()).unwrap_or(0);
-    let _ = tray.set_tooltip(Some(format!("Claude: {active}\n세션 사용 {used} · 끊김 {broken}")));
+    let version = &app.package_info().version;
+    let _ = tray.set_tooltip(Some(format!("Claude Widget v{version}\n{active}\n세션 사용 {used} · 끊김 {broken}")));
     if let Ok(menu) = build_menu(app, s, true) {
         let _ = tray.set_menu(Some(menu));
     }
