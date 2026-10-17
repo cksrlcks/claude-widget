@@ -42,6 +42,15 @@ export function WidgetPage() {
             updateVersion={s.update.available?.version}
             className="mb-2.5"
           />
+          {s.authProblem && (
+            <button
+              type="button"
+              onClick={() => api.loginNew()}
+              className="bg-destructive/14 hover:bg-destructive/20 mb-2.5 w-full cursor-pointer rounded-[10px] px-2.5 py-[7px] text-left text-xs text-[#ffd3da]"
+            >
+              ⚠ {s.authProblem} · 클릭해서 다시 로그인
+            </button>
+          )}
           <UsageMeter
             label="세션 (5시간) 사용"
             window={s.usage?.session ?? null}

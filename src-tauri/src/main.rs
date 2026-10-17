@@ -34,6 +34,8 @@ struct Runtime {
     usage: Value,
     usage_source: Option<String>,
     usage_error: Option<String>,
+    /// 토큰이 서버에서 거부됨 → 다시 로그인 필요
+    auth_problem: Option<String>,
     usage_fetched_at: f64,
     checking: bool,
     mini: bool,
@@ -115,6 +117,7 @@ fn build_state(app: &AppHandle) -> Value {
         "usage": rt.usage,
         "usageSource": rt.usage_source,
         "usageError": rt.usage_error,
+        "authProblem": rt.auth_problem,
         "integrations": {
             "checking": rt.checking,
             "checkedAt": s.last_integrations.as_ref().map(|r| r.checked_at),
@@ -201,6 +204,7 @@ async fn refresh_status(app: AppHandle, force: bool) {
         let mut rt = st.rt.lock().unwrap();
         rt.usage = Value::Null;
         rt.usage_source = None;
+        rt.auth_problem = None;
         drop(rt);
         return broadcast(&app);
     };
@@ -239,6 +243,11 @@ async fn refresh_status(app: AppHandle, force: bool) {
                 }
             }
         }
+        // 파일에 토큰이 있어도 서버가 거부(401/403)하거나 리프레시 토큰까지 만료면 실제로는 로그아웃 상태
+        let refresh_expired =
+            live["oauth"]["refreshTokenExpiresAt"].as_f64().map(|t| t < claude::now_ms()).unwrap_or(false);
+        let rejected = matches!(rt.usage_error.as_deref(), Some("usage 401" | "usage 403"));
+        rt.auth_problem = (refresh_expired || rejected).then(|| "로그인이 풀렸습니다".to_string());
     }
     {
         let st = state(&app);
@@ -856,6 +865,7 @@ fn main() {
                 usage: Value::Null,
                 usage_source: None,
                 usage_error: None,
+                auth_problem: None,
                 usage_fetched_at: 0.0,
                 checking: false,
                 mini: false,

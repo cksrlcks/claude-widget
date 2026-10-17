@@ -56,6 +56,8 @@ export type AppState = {
   usage: Usage | null
   usageSource: UsageSource | null
   usageError: string | null
+  /** 토큰이 서버에서 거부됨 — 다시 로그인 필요 */
+  authProblem: string | null
   integrations: {
     checking: boolean
     checkedAt: number | null
