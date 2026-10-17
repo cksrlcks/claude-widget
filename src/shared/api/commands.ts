@@ -31,6 +31,7 @@ export const api = {
   setWatch: (keys: string[] | null) => invoke<void>("set_watch", { keys }),
   setInterval: (min: number) => invoke<void>("set_interval", { min }),
   setAutoStart: (on: boolean) => invoke<void>("set_auto_start", { on }),
+  setAvatarMotion: (on: boolean) => invoke<void>("set_avatar_motion", { on }),
 
   // 앱 업데이트
   checkUpdate: () => invoke<void>("check_update_cmd"),

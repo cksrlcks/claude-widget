@@ -96,7 +96,7 @@
 /* 일하는 데 방해되지 않게: 대부분 가만히 있다가 가끔 작게 움직임 */
 /* Clawd: 뚝뚝 끊어서 살짝 들썩 */
 .px-bob {
-  animation: px-bob 4s step-end infinite;
+  animation: px-bob 2.5s step-end infinite;
 }
 @keyframes px-bob {
   80% {
@@ -108,7 +108,7 @@
 }
 /* 슬라임: 가끔 말랑 */
 .px-squash {
-  animation: px-squash 6s ease-in-out infinite;
+  animation: px-squash 4s ease-in-out infinite;
 }
 @keyframes px-squash {
   0%,
@@ -125,7 +125,7 @@
 }
 /* 유령: 천천히 둥실 */
 .px-float {
-  animation: px-float 7s ease-in-out infinite;
+  animation: px-float 4.5s ease-in-out infinite;
 }
 @keyframes px-float {
   0%,
@@ -138,7 +138,7 @@
 }
 /* 고양이: 가끔 갸웃 */
 .px-tilt {
-  animation: px-tilt 8s step-end infinite;
+  animation: px-tilt 5s step-end infinite;
 }
 @keyframes px-tilt {
   80% {
@@ -150,7 +150,7 @@
 }
 /* 개구리: 가끔 작게 폴짝 */
 .px-hop {
-  animation: px-hop 7s ease-out infinite;
+  animation: px-hop 4.5s ease-out infinite;
 }
 @keyframes px-hop {
   0%,
@@ -164,7 +164,7 @@
 }
 /* 병아리: 가끔 콕 */
 .px-peck {
-  animation: px-peck 7s step-end infinite;
+  animation: px-peck 4.5s step-end infinite;
 }
 @keyframes px-peck {
   85% {
@@ -176,7 +176,7 @@
 }
 /* 토끼: 가끔 깡충 */
 .px-bounce {
-  animation: px-bounce 7s ease-out infinite;
+  animation: px-bounce 4.5s ease-out infinite;
 }
 @keyframes px-bounce {
   0%,
@@ -190,7 +190,7 @@
 }
 /* 공룡: 천천히 뒤뚱 */
 .px-waddle {
-  animation: px-waddle 5s step-end infinite;
+  animation: px-waddle 3s step-end infinite;
 }
 @keyframes px-waddle {
   80% {

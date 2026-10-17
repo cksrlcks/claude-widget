@@ -57,6 +57,8 @@ pub struct Store {
     pub last_integrations: Option<IntegrationResult>,
     pub position: Option<Position>,
     pub mcp_interval_min: u64,
+    /// 아바타 애니메이션 켜기
+    pub avatar_motion: bool,
 }
 
 impl Default for Store {
@@ -68,6 +70,7 @@ impl Default for Store {
             last_integrations: None,
             position: None,
             mcp_interval_min: 10,
+            avatar_motion: true,
         }
     }
 }

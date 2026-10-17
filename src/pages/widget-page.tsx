@@ -28,12 +28,18 @@ export function WidgetPage() {
       className="cursor-grab select-none"
     >
       {s.mini ? (
-        <MiniBubble profile={profile} integrations={s.integrations} onExpand={() => api.setMini(false)} />
+        <MiniBubble
+          profile={profile}
+          integrations={s.integrations}
+          onExpand={() => api.setMini(false)}
+          animated={s.avatarMotion}
+        />
       ) : (
         <div ref={cardRef} className="bg-widget rounded-2xl border border-white/10 px-3.5 py-3">
           <AccountHeader
             profile={profile}
             onMinimize={() => api.setMini(true)}
+            animated={s.avatarMotion}
             updateVersion={s.update.available?.version}
             className="mb-2.5"
           />

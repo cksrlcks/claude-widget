@@ -75,6 +75,7 @@ export type AppState = {
   plugins: Integration[]
   mcpIntervalMin: number
   autoStart: boolean
+  avatarMotion: boolean
   mini: boolean
   update: UpdateInfo
 }

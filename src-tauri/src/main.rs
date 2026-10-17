@@ -132,6 +132,7 @@ fn build_state(app: &AppHandle) -> Value {
         "skills": claude::list_skills(rt.org_id.as_deref(), rt.active_id.as_deref()),
         "plugins": all_items.iter().filter(|i| i.kind == "plugin").collect::<Vec<_>>(),
         "mcpIntervalMin": s.mcp_interval_min,
+        "avatarMotion": s.avatar_motion,
         "autoStart": app.autolaunch().is_enabled().unwrap_or(false),
         "mini": rt.mini,
         "update": st.update.lock().unwrap().to_json(&app.package_info().version.to_string()),
@@ -758,6 +759,17 @@ fn set_interval(app: AppHandle, min: f64) {
 }
 
 #[tauri::command]
+fn set_avatar_motion(app: AppHandle, on: bool) {
+    {
+        let st = state(&app);
+        let mut s = st.store.lock().unwrap();
+        s.avatar_motion = on;
+        s.save();
+    }
+    broadcast(&app);
+}
+
+#[tauri::command]
 fn set_auto_start(app: AppHandle, on: bool) {
     let al = app.autolaunch();
     let _ = if on { al.enable() } else { al.disable() };
@@ -893,6 +905,7 @@ fn main() {
             set_watch,
             set_interval,
             set_auto_start,
+            set_avatar_motion,
             set_mini,
             set_height,
             account_menu,

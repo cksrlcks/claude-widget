@@ -41,6 +41,10 @@ export function GeneralSection({ state, className }: Props) {
         <Checkbox checked={state.autoStart} onCheckedChange={(v) => api.setAutoStart(v === true)} />
         Windows 시작 시 자동 실행
       </label>
+      <label className="flex w-fit cursor-pointer items-center gap-2.5">
+        <Checkbox checked={state.avatarMotion} onCheckedChange={(v) => api.setAvatarMotion(v === true)} />
+        아바타 움직임
+      </label>
     </Section>
   )
 }
