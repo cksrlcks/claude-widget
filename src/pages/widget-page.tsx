@@ -30,7 +30,7 @@ export function WidgetPage() {
       {s.mini ? (
         <MiniBubble profile={profile} integrations={s.integrations} onExpand={() => api.setMini(false)} />
       ) : (
-        <div ref={cardRef} className="px-3.5 py-3">
+        <div ref={cardRef} className="bg-widget rounded-2xl border border-white/10 px-3.5 py-3">
           <AccountHeader
             profile={profile}
             onMinimize={() => api.setMini(true)}
