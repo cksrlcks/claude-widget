@@ -29,7 +29,7 @@ export function UsageMeter({ label, window: w, source, fallback, className }: Pr
           style={{ width: `${used ?? 0}%` }}
         />
       </div>
-      {sub && <div className="text-muted-foreground mt-[3px] text-[10.5px]">{sub}</div>}
+      {sub && <div className="text-muted-foreground mt-[5px] text-[10.5px]">{sub}</div>}
     </div>
   )
 }
