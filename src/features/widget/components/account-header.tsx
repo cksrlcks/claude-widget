@@ -17,7 +17,7 @@ type Props = {
 export function AccountHeader({ profile, onMinimize, updateVersion, className }: Props) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <ProfileAvatar profile={profile} className="size-[34px] ring-2 ring-white/10" />
+      <ProfileAvatar profile={profile} animated className="size-[34px] ring-2 ring-white/10" />
       <div className="grid min-w-0 flex-1 gap-px">
         <div className="truncate text-[13.5px] font-semibold">
           {profile ? profile.label || profile.displayName : "로그인 안 됨"}

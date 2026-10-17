@@ -1,7 +1,8 @@
 import { useRef } from "react"
 import { Plus } from "lucide-react"
+import { toast } from "sonner"
 
-import { resizeToDataUrl } from "@/features/accounts/lib/resize-image"
+import { toAvatarDataUrl } from "@/features/accounts/lib/avatar-image"
 import { cn } from "@/lib/utils"
 import { useUpdateProfile } from "@/shared/api/mutations"
 import { AVATARS, Clawd } from "@/shared/components/profile-avatar"
@@ -21,8 +22,12 @@ export function AvatarPicker({ profile, className }: Props) {
 
   const upload = async (file: File | undefined) => {
     if (!file) return
-    const customAvatar = await resizeToDataUrl(file)
-    update.mutate({ id: profile.id, patch: { avatar: "custom", customAvatar } })
+    try {
+      const customAvatar = await toAvatarDataUrl(file)
+      update.mutate({ id: profile.id, patch: { avatar: "custom", customAvatar } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "이미지를 올리지 못했습니다")
+    }
   }
 
   return (
@@ -39,7 +44,7 @@ export function AvatarPicker({ profile, className }: Props) {
       )}
       <button
         type="button"
-        title="내 이미지 업로드"
+        title="내 이미지 업로드 (GIF는 움직임 유지, 2MB 이하)"
         onClick={() => fileRef.current?.click()}
         className="text-muted-foreground border-border-strong hover:text-foreground grid size-[34px] cursor-pointer place-items-center rounded-full border border-dashed"
       >

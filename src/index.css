@@ -79,3 +79,38 @@
     scrollbar-color: var(--border-strong) transparent;
   }
 }
+
+/* Clawd 아바타: 픽셀 그림 느낌을 살리려고 부드럽게 말고 뚝뚝 끊어서 움직임 */
+@keyframes clawd-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+@keyframes clawd-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.15);
+  }
+}
+.clawd-bob {
+  animation: clawd-bob 1.2s step-end infinite;
+}
+.clawd-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: clawd-blink 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .clawd-bob,
+  .clawd-blink {
+    animation: none;
+  }
+}

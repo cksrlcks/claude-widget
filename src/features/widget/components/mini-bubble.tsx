@@ -19,7 +19,7 @@ type Props = {
 export function MiniBubble({ profile, integrations, onExpand, className }: Props) {
   return (
     <div className={cn("group relative size-[60px]", className)}>
-      <ProfileAvatar profile={profile} className="absolute top-1 left-1 size-[52px] ring-2 ring-white/10" />
+      <ProfileAvatar profile={profile} animated className="absolute top-1 left-1 size-[52px] ring-2 ring-white/10" />
       <span
         className={cn(
           "border-widget absolute right-1.5 bottom-1.5 size-3.5 rounded-full border-2",
