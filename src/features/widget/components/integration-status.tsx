@@ -18,9 +18,9 @@ export function IntegrationStatus({ integrations, className }: Props) {
       : error && !total
         ? "MCP 확인 실패"
         : bad
-          ? `${total}개 중 ${broken.length}개 끊어짐`
+          ? `감시 중 ${total}개 중 ${broken.length}개 끊어짐`
           : total
-            ? `MCP·플러그인 ${total}개 정상`
+            ? `감시 중 ${total}개 정상`
             : "감시 중인 항목 없음"
 
   const dot = checking

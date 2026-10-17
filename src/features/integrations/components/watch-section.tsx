@@ -32,7 +32,7 @@ export function WatchSection({ state, className }: Props) {
   return (
     <Section
       title="감시할 MCP · 플러그인"
-      description={info}
+      description={`${info} · 체크한 항목만 위젯에 표시됩니다`}
       className={className}
       action={
         <Button variant="secondary" disabled={checking} onClick={() => api.recheck()}>

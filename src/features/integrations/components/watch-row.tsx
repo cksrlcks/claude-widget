@@ -32,6 +32,7 @@ export function WatchRow({ item, current, checked, disabled, onCheckedChange, cl
     <label
       className={cn(
         "grid min-h-9 cursor-pointer grid-cols-[16px_minmax(0,1fr)_68px_96px_64px] items-center gap-x-2.5 rounded-lg px-2.5 hover:bg-white/[0.035]",
+        !checked && "opacity-45",
         className,
       )}
     >
