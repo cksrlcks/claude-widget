@@ -93,146 +93,120 @@
   transform-box: fill-box;
   transform-origin: 50% 100%; /* 발밑 기준으로 눌리고 기울어짐 */
 }
-/* Clawd: 픽셀 느낌 살리려고 뚝뚝 끊어서 들썩 */
+/* 일하는 데 방해되지 않게: 대부분 가만히 있다가 가끔 작게 움직임 */
+/* Clawd: 뚝뚝 끊어서 살짝 들썩 */
 .px-bob {
-  animation: px-bob 1.2s step-end infinite;
+  animation: px-bob 4s step-end infinite;
 }
 @keyframes px-bob {
-  50% {
-    transform: translateY(2px);
+  80% {
+    transform: translateY(1px);
+  }
+  90% {
+    transform: translateY(0);
   }
 }
-/* 슬라임: 말랑하게 납작 ↔ 길쭉 */
+/* 슬라임: 가끔 말랑 */
 .px-squash {
-  animation: px-squash 1.4s ease-in-out infinite;
+  animation: px-squash 6s ease-in-out infinite;
 }
 @keyframes px-squash {
   0%,
+  70%,
   100% {
     transform: scale(1, 1);
   }
-  40% {
-    transform: scale(1.1, 0.86);
+  80% {
+    transform: scale(1.05, 0.94);
   }
-  70% {
-    transform: scale(0.94, 1.06);
+  90% {
+    transform: scale(0.98, 1.02);
   }
 }
-/* 유령: 둥실둥실 떠다니며 좌우로 */
+/* 유령: 천천히 둥실 */
 .px-float {
-  animation: px-float 2.6s ease-in-out infinite;
+  animation: px-float 7s ease-in-out infinite;
 }
 @keyframes px-float {
   0%,
   100% {
     transform: translate(0, 0);
   }
-  25% {
-    transform: translate(1.5px, -2px);
-  }
   50% {
-    transform: translate(0, -3.5px);
-  }
-  75% {
-    transform: translate(-1.5px, -2px);
+    transform: translate(0, -1.5px);
   }
 }
-/* 고양이: 고개 갸웃갸웃 */
+/* 고양이: 가끔 갸웃 */
 .px-tilt {
-  animation: px-tilt 3s step-end infinite;
+  animation: px-tilt 8s step-end infinite;
 }
 @keyframes px-tilt {
-  30% {
-    transform: rotate(-7deg);
-  }
-  60% {
-    transform: rotate(0);
-  }
   80% {
-    transform: rotate(7deg);
+    transform: rotate(-4deg);
   }
-  100% {
+  90% {
     transform: rotate(0);
   }
 }
-/* 개구리: 가만히 있다가 폴짝 */
+/* 개구리: 가끔 작게 폴짝 */
 .px-hop {
-  animation: px-hop 2.4s ease-out infinite;
+  animation: px-hop 7s ease-out infinite;
 }
 @keyframes px-hop {
   0%,
-  60%,
+  86%,
   100% {
-    transform: translateY(0) scaleY(1);
+    transform: translateY(0);
   }
-  66% {
-    transform: translateY(0) scaleY(0.85);
-  }
-  76% {
-    transform: translateY(-8px) scaleY(1.05);
-  }
-  86% {
-    transform: translateY(0) scaleY(1);
+  92% {
+    transform: translateY(-3px);
   }
 }
-/* 병아리: 콕콕 쪼기 */
+/* 병아리: 가끔 콕 */
 .px-peck {
-  animation: px-peck 2.2s step-end infinite;
+  animation: px-peck 7s step-end infinite;
 }
 @keyframes px-peck {
-  70% {
-    transform: rotate(14deg) translateY(1px);
+  85% {
+    transform: rotate(8deg);
   }
-  78% {
-    transform: rotate(0);
-  }
-  86% {
-    transform: rotate(14deg) translateY(1px);
-  }
-  94% {
+  90% {
     transform: rotate(0);
   }
 }
-/* 토끼: 깡충깡충 두 번 */
+/* 토끼: 가끔 깡충 */
 .px-bounce {
-  animation: px-bounce 2s ease-out infinite;
+  animation: px-bounce 7s ease-out infinite;
 }
 @keyframes px-bounce {
   0%,
-  40%,
+  86%,
   100% {
     transform: translateY(0);
   }
-  50% {
-    transform: translateY(-5px);
-  }
-  60% {
-    transform: translateY(0);
-  }
-  70% {
-    transform: translateY(-3px);
-  }
-  80% {
-    transform: translateY(0);
+  92% {
+    transform: translateY(-2.5px);
   }
 }
-/* 공룡: 좌우로 뒤뚱뒤뚱 */
+/* 공룡: 천천히 뒤뚱 */
 .px-waddle {
-  animation: px-waddle 1s step-end infinite;
+  animation: px-waddle 5s step-end infinite;
 }
 @keyframes px-waddle {
-  0%,
-  100% {
-    transform: translate(-1.5px, 0) rotate(-4deg);
+  80% {
+    transform: rotate(-2deg);
   }
-  50% {
-    transform: translate(1.5px, -1px) rotate(4deg);
+  90% {
+    transform: rotate(2deg);
+  }
+  100% {
+    transform: rotate(0);
   }
 }
 /* 눈 깜빡임 (모든 캐릭터 공통) */
 .px-blink {
   transform-origin: center;
-  animation: px-blink 4s linear infinite;
+  animation: px-blink 6s linear infinite;
 }
 @keyframes px-blink {
   0%,
