@@ -26,29 +26,31 @@ export function AccountHeader({ profile, onMinimize, updateVersion, className }:
           {profile ? `${profile.email}${profile.plan ? ` · ${profile.plan}` : ""}` : "설정에서 로그인하세요"}
         </div>
       </div>
-      {updateVersion && (
+      <div className="-mr-1 flex shrink-0 items-center">
+        {updateVersion && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-primary"
+            title={`새 버전 v${updateVersion} — 설정에서 업데이트`}
+            onClick={() => api.openSettings()}
+          >
+            <ArrowUpCircle />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="미니 모드" onClick={onMinimize}>
+          <Minimize2 />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="text-primary"
-          title={`새 버전 v${updateVersion} — 설정에서 업데이트`}
+          className="text-muted-foreground"
+          title="설정 / 계정 전환"
           onClick={() => api.openSettings()}
         >
-          <ArrowUpCircle />
+          <Settings />
         </Button>
-      )}
-      <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="미니 모드" onClick={onMinimize}>
-        <Minimize2 />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="text-muted-foreground -mr-1"
-        title="설정 / 계정 전환"
-        onClick={() => api.openSettings()}
-      >
-        <Settings />
-      </Button>
+      </div>
     </div>
   )
 }
