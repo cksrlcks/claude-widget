@@ -80,17 +80,161 @@
   }
 }
 
-/* Clawd 아바타: 픽셀 그림 느낌을 살리려고 부드럽게 말고 뚝뚝 끊어서 움직임 */
-@keyframes clawd-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
+/* 도트 아바타 모션 (pixel-sprites.ts의 motion). 단위는 SVG viewBox(64) 기준 — 2 ≈ 반 픽셀 */
+.px-bob,
+.px-squash,
+.px-float,
+.px-tilt,
+.px-hop,
+.px-peck,
+.px-bounce,
+.px-waddle,
+.px-blink {
+  transform-box: fill-box;
+  transform-origin: 50% 100%; /* 발밑 기준으로 눌리고 기울어짐 */
+}
+/* Clawd: 픽셀 느낌 살리려고 뚝뚝 끊어서 들썩 */
+.px-bob {
+  animation: px-bob 1.2s step-end infinite;
+}
+@keyframes px-bob {
   50% {
     transform: translateY(2px);
   }
 }
-@keyframes clawd-blink {
+/* 슬라임: 말랑하게 납작 ↔ 길쭉 */
+.px-squash {
+  animation: px-squash 1.4s ease-in-out infinite;
+}
+@keyframes px-squash {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  40% {
+    transform: scale(1.1, 0.86);
+  }
+  70% {
+    transform: scale(0.94, 1.06);
+  }
+}
+/* 유령: 둥실둥실 떠다니며 좌우로 */
+.px-float {
+  animation: px-float 2.6s ease-in-out infinite;
+}
+@keyframes px-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(1.5px, -2px);
+  }
+  50% {
+    transform: translate(0, -3.5px);
+  }
+  75% {
+    transform: translate(-1.5px, -2px);
+  }
+}
+/* 고양이: 고개 갸웃갸웃 */
+.px-tilt {
+  animation: px-tilt 3s step-end infinite;
+}
+@keyframes px-tilt {
+  30% {
+    transform: rotate(-7deg);
+  }
+  60% {
+    transform: rotate(0);
+  }
+  80% {
+    transform: rotate(7deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+/* 개구리: 가만히 있다가 폴짝 */
+.px-hop {
+  animation: px-hop 2.4s ease-out infinite;
+}
+@keyframes px-hop {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  66% {
+    transform: translateY(0) scaleY(0.85);
+  }
+  76% {
+    transform: translateY(-8px) scaleY(1.05);
+  }
+  86% {
+    transform: translateY(0) scaleY(1);
+  }
+}
+/* 병아리: 콕콕 쪼기 */
+.px-peck {
+  animation: px-peck 2.2s step-end infinite;
+}
+@keyframes px-peck {
+  70% {
+    transform: rotate(14deg) translateY(1px);
+  }
+  78% {
+    transform: rotate(0);
+  }
+  86% {
+    transform: rotate(14deg) translateY(1px);
+  }
+  94% {
+    transform: rotate(0);
+  }
+}
+/* 토끼: 깡충깡충 두 번 */
+.px-bounce {
+  animation: px-bounce 2s ease-out infinite;
+}
+@keyframes px-bounce {
+  0%,
+  40%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(0);
+  }
+  70% {
+    transform: translateY(-3px);
+  }
+  80% {
+    transform: translateY(0);
+  }
+}
+/* 공룡: 좌우로 뒤뚱뒤뚱 */
+.px-waddle {
+  animation: px-waddle 1s step-end infinite;
+}
+@keyframes px-waddle {
+  0%,
+  100% {
+    transform: translate(-1.5px, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate(1.5px, -1px) rotate(4deg);
+  }
+}
+/* 눈 깜빡임 (모든 캐릭터 공통) */
+.px-blink {
+  transform-origin: center;
+  animation: px-blink 4s linear infinite;
+}
+@keyframes px-blink {
   0%,
   92%,
   100% {
@@ -100,17 +244,8 @@
     transform: scaleY(0.15);
   }
 }
-.clawd-bob {
-  animation: clawd-bob 1.2s step-end infinite;
-}
-.clawd-blink {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: clawd-blink 4s linear infinite;
-}
 @media (prefers-reduced-motion: reduce) {
-  .clawd-bob,
-  .clawd-blink {
-    animation: none;
+  [class^="px-"] {
+    animation: none !important;
   }
 }

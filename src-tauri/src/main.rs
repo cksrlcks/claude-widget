@@ -23,7 +23,8 @@ use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 
-const AVATAR_KEYS: [&str; 5] = ["a1", "a2", "a3", "a4", "a5"];
+// 새 계정에 아직 안 쓴 아바타부터 배정 (src/shared/lib/pixel-sprites.ts의 키와 맞춤)
+const AVATAR_KEYS: [&str; 8] = ["a1", "slime", "ghost", "cat", "frog", "chick", "bunny", "dino"];
 const FULL_W: f64 = 236.0;
 const MINI: f64 = 60.0;
 

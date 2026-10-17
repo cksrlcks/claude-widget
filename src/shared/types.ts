@@ -1,10 +1,13 @@
+import type { SpriteKey } from "@/shared/lib/pixel-sprites"
+
 // Rust 백엔드(build_state, catalog)가 보내는 JSON 구조 — 백엔드를 바꾸면 여기부터 고친다
 
 export type UsageWindow = { used: number; resetsAt: string | null }
 export type Usage = { session: UsageWindow | null; weekly: UsageWindow | null }
 export type UsageSource = "live" | "cache" | "stored"
 
-export type AvatarKey = "a1" | "a2" | "a3" | "a4" | "a5" | "custom"
+/** 도트 캐릭터 키(pixel-sprites.ts의 SPRITES) 또는 업로드 이미지 */
+export type AvatarKey = SpriteKey | "custom"
 
 export type Profile = {
   id: string

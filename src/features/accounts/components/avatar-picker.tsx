@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { toAvatarDataUrl } from "@/features/accounts/lib/avatar-image"
 import { cn } from "@/lib/utils"
 import { useUpdateProfile } from "@/shared/api/mutations"
-import { AVATARS, Clawd } from "@/shared/components/profile-avatar"
+import { AVATARS, PixelAvatar } from "@/shared/components/profile-avatar"
 import type { Profile } from "@/shared/types"
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
   className?: string
 }
 
-/** 기본 Clawd 5색 + 업로드한 이미지 중 선택 */
+/** 도트 캐릭터 + 업로드한 이미지 중 선택 */
 export function AvatarPicker({ profile, className }: Props) {
   const update = useUpdateProfile()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -31,10 +31,10 @@ export function AvatarPicker({ profile, className }: Props) {
   }
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {AVATARS.map((a) => (
         <PickButton key={a.key} title={a.name} selected={profile.avatar === a.key} onClick={() => pick(a.key)}>
-          <Clawd avatarKey={a.key} />
+          <PixelAvatar avatarKey={a.key} />
         </PickButton>
       ))}
       {profile.customAvatar && (
