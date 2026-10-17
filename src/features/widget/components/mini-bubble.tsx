@@ -1,44 +1,36 @@
+import { Maximize2 } from "lucide-react"
+
+import { statusDotClass } from "@/features/widget/components/integration-status"
 import { cn } from "@/lib/utils"
 import { ProfileAvatar } from "@/shared/components/profile-avatar"
-import { usageTone } from "@/shared/lib/format"
-import type { Profile } from "@/shared/types"
-
-const RING = 2 * Math.PI * 34 // viewBox 76 기준 둘레
-const RING_TONE = { success: "stroke-success", warning: "stroke-warning", destructive: "stroke-destructive" }
+import type { AppState, Profile } from "@/shared/types"
 
 type Props = {
   profile: Profile | undefined
-  /** 세션 사용률 0~100 */
-  used: number
-  brokenCount: number
-  onClick: () => void
+  integrations: AppState["integrations"]
+  onExpand: () => void
   className?: string
 }
 
-/** 미니 모드: 아바타 + 세션 사용량 링 + 끊김 뱃지 */
-export function MiniBubble({ profile, used, brokenCount, onClick, className }: Props) {
+/** 미니 모드: 둥근 아바타 + 귀퉁이 MCP·플러그인 상태등(색만). 마우스를 올리면 확장 버튼 */
+export function MiniBubble({ profile, integrations, onExpand, className }: Props) {
   return (
-    <div onClick={onClick} className={cn("relative size-[60px] cursor-pointer", className)}>
-      <svg viewBox="0 0 76 76" className="absolute inset-[3px] size-[54px] -rotate-90">
-        <circle cx="38" cy="38" r="34" className="fill-widget stroke-white/12" strokeWidth={5} />
-        <circle
-          cx="38"
-          cy="38"
-          r="34"
-          fill="none"
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeDasharray={RING}
-          strokeDashoffset={RING * (1 - used / 100)}
-          className={cn("transition-[stroke-dashoffset] duration-400", RING_TONE[usageTone(used)])}
-        />
-      </svg>
-      <ProfileAvatar profile={profile} className="absolute inset-[10px] size-10" />
-      {brokenCount > 0 && (
-        <span className="bg-destructive border-widget absolute top-px right-px h-5 min-w-5 rounded-full border-2 px-1 text-center text-[11px] leading-4 font-bold text-white">
-          {brokenCount}
-        </span>
-      )}
+    <div className={cn("group relative grid size-[60px] place-items-center", className)}>
+      <ProfileAvatar profile={profile} className="size-11 ring-2 ring-white/10" />
+      <span
+        className={cn(
+          "border-widget absolute right-1.5 bottom-1.5 size-3.5 rounded-full border-2",
+          statusDotClass(integrations),
+        )}
+      />
+      <button
+        type="button"
+        title="펼치기"
+        onClick={onExpand}
+        className="bg-widget/90 text-foreground hover:bg-primary absolute top-1 right-1 hidden size-5 cursor-pointer place-items-center rounded-full ring-1 ring-white/15 group-hover:grid"
+      >
+        <Maximize2 className="size-3" />
+      </button>
     </div>
   )
 }

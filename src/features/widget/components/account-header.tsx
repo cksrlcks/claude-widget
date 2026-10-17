@@ -1,4 +1,4 @@
-import { ArrowUpCircle, Settings } from "lucide-react"
+import { ArrowUpCircle, Minimize2, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -8,18 +8,16 @@ import type { Profile } from "@/shared/types"
 
 type Props = {
   profile: Profile | undefined
-  onAvatarClick: () => void
+  onMinimize: () => void
   /** 새 버전이 있으면 그 버전 — 업데이트 아이콘 표시 */
   updateVersion?: string
   className?: string
 }
 
-export function AccountHeader({ profile, onAvatarClick, updateVersion, className }: Props) {
+export function AccountHeader({ profile, onMinimize, updateVersion, className }: Props) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <button type="button" onClick={onAvatarClick} title="미니 모드" className="cursor-pointer">
-        <ProfileAvatar profile={profile} className="size-[34px] ring-2 ring-white/10" />
-      </button>
+      <ProfileAvatar profile={profile} className="size-[34px] ring-2 ring-white/10" />
       <div className="grid min-w-0 flex-1 gap-px">
         <div className="truncate text-[13.5px] font-semibold">
           {profile ? profile.label || profile.displayName : "로그인 안 됨"}
@@ -39,6 +37,9 @@ export function AccountHeader({ profile, onAvatarClick, updateVersion, className
           <ArrowUpCircle />
         </Button>
       )}
+      <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="미니 모드" onClick={onMinimize}>
+        <Minimize2 />
+      </Button>
       <Button
         variant="ghost"
         size="icon-sm"

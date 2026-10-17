@@ -7,6 +7,13 @@ type Props = {
   className?: string
 }
 
+/** 상태등 색 (확장 모드 요약 버튼과 미니 모드가 같이 씀): 확인 중 노랑, 끊김 빨강, 정상 초록 */
+export function statusDotClass({ broken, total, checking, error }: AppState["integrations"]) {
+  if (checking) return "bg-warning animate-pulse"
+  if (broken.length > 0 || (error && !total)) return "bg-destructive shadow-[0_0_0_3px] shadow-destructive/20"
+  return "bg-success shadow-[0_0_0_3px] shadow-success/15"
+}
+
 /** "4개 중 2개 끊어짐" 요약 버튼. 클릭하면 즉시 다시 확인 */
 export function IntegrationStatus({ integrations, className }: Props) {
   const { broken, total, checking, checkedAt, error } = integrations
@@ -23,12 +30,6 @@ export function IntegrationStatus({ integrations, className }: Props) {
             ? `감시 중 ${total}개 정상`
             : "감시 중인 항목 없음"
 
-  const dot = checking
-    ? "bg-warning animate-pulse"
-    : bad || (error && !total)
-      ? "bg-destructive shadow-[0_0_0_3px] shadow-destructive/20"
-      : "bg-success shadow-[0_0_0_3px] shadow-success/15"
-
   return (
     <button
       type="button"
@@ -40,7 +41,7 @@ export function IntegrationStatus({ integrations, className }: Props) {
         className,
       )}
     >
-      <span className={cn("size-2 shrink-0 rounded-full", dot)} />
+      <span className={cn("size-2 shrink-0 rounded-full", statusDotClass(integrations))} />
       {text}
     </button>
   )
