@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react"
 
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { api } from "@/shared/api/commands"
 import { Section } from "@/shared/components/section"
-import type { AppState } from "@/shared/types"
+import type { AppState, WidgetAnchor } from "@/shared/types"
+
+const ANCHORS: { value: WidgetAnchor; label: string }[] = [
+  { value: "", label: "자유" },
+  { value: "tl", label: "왼쪽 위" },
+  { value: "tr", label: "오른쪽 위" },
+  { value: "bl", label: "왼쪽 아래" },
+  { value: "br", label: "오른쪽 아래" },
+]
 
 type Props = {
   state: AppState
@@ -45,6 +54,20 @@ export function GeneralSection({ state, className }: Props) {
         <Checkbox checked={state.avatarMotion} onCheckedChange={(v) => api.setAvatarMotion(v === true)} />
         아바타 움직임
       </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1">위젯 위치</span>
+        {ANCHORS.map((a) => (
+          <Button
+            key={a.value}
+            size="xs"
+            variant={state.anchor === a.value ? "default" : "outline"}
+            aria-pressed={state.anchor === a.value}
+            onClick={() => api.setAnchor(a.value)}
+          >
+            {a.label}
+          </Button>
+        ))}
+      </div>
     </Section>
   )
 }

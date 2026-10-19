@@ -59,6 +59,8 @@ pub struct Store {
     pub mcp_interval_min: u64,
     /// 아바타 애니메이션 켜기
     pub avatar_motion: bool,
+    /// 고정 위치: "" (자유, 드래그한 곳) | "tl" | "tr" | "bl" | "br"
+    pub anchor: String,
 }
 
 impl Default for Store {
@@ -71,6 +73,7 @@ impl Default for Store {
             position: None,
             mcp_interval_min: 10,
             avatar_motion: true,
+            anchor: String::new(),
         }
     }
 }

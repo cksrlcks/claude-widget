@@ -133,6 +133,7 @@ fn build_state(app: &AppHandle) -> Value {
         "plugins": all_items.iter().filter(|i| i.kind == "plugin").collect::<Vec<_>>(),
         "mcpIntervalMin": s.mcp_interval_min,
         "avatarMotion": s.avatar_motion,
+        "anchor": s.anchor,
         "autoStart": app.autolaunch().is_enabled().unwrap_or(false),
         "mini": rt.mini,
         "update": st.update.lock().unwrap().to_json(&app.package_info().version.to_string()),
@@ -477,30 +478,48 @@ fn widget(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window("widget")
 }
 
-fn place_widget(app: &AppHandle) {
-    let Some(w) = widget(app) else { return };
-    let (mini, full_h, pos) = {
+// 위젯 크기·위치(px) 계산
+fn widget_target(app: &AppHandle, w: &WebviewWindow) -> Option<(PhysicalSize<u32>, PhysicalPosition<i32>)> {
+    let (mini, full_h, pos, anchor) = {
         let st = state(app);
-        let pos = st.store.lock().unwrap().position.clone();
+        let s = st.store.lock().unwrap();
         let rt = st.rt.lock().unwrap();
-        (rt.mini, rt.full_height, pos)
+        (rt.mini, rt.full_height, s.position.clone(), s.anchor.clone())
     };
     let monitor = pos
         .as_ref()
         .and_then(|p| app.monitor_from_point(p.right - 1.0, p.y).ok().flatten())
-        .or_else(|| app.primary_monitor().ok().flatten());
-    let Some(m) = monitor else { return };
-    let scale = m.scale_factor();
-    let area = m.work_area();
+        .or_else(|| app.primary_monitor().ok().flatten())?;
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
     let (ax, ay) = (area.position.x as f64, area.position.y as f64);
     let (aw, ah) = (area.size.width as f64, area.size.height as f64);
     let (w_px, h_px) = if mini { (MINI * scale, MINI * scale) } else { (FULL_W * scale, full_h * scale) };
+    let margin = 16.0 * scale;
 
-    // 저장된 위치는 "보이는 카드의 오른쪽 끝" 기준 → 미니/확장 전환 시 오른쪽 정렬 유지. 화면 밖이면 안쪽으로 보정
-    let right = pos.as_ref().map(|p| p.right).unwrap_or(ax + aw - 16.0 * scale).clamp(ax + w_px, ax + aw);
-    let y = pos.as_ref().map(|p| p.y).unwrap_or(ay + ah * 0.3).clamp(ay, (ay + ah - h_px).max(ay));
-    let _ = w.set_size(PhysicalSize::new(w_px.round() as u32, h_px.round() as u32));
-    let _ = w.set_position(PhysicalPosition::new((right - w_px - frame_border(&w)).round() as i32, y.round() as i32));
+    let (right, y) = match anchor.as_str() {
+        // 고정 위치: 모서리 기준이라 미니/확장 전환해도 그 모서리에 붙어 있음
+        "tl" | "tr" | "bl" | "br" => (
+            if anchor.ends_with('l') { ax + margin + w_px } else { ax + aw - margin },
+            if anchor.starts_with('t') { ay + margin } else { ay + ah - margin - h_px },
+        ),
+        // 저장된 위치는 "보이는 카드의 오른쪽 끝" 기준 → 미니/확장 전환 시 오른쪽 정렬 유지. 화면 밖이면 안쪽으로 보정
+        _ => (
+            pos.as_ref().map(|p| p.right).unwrap_or(ax + aw - margin).clamp(ax + w_px, ax + aw),
+            pos.as_ref().map(|p| p.y).unwrap_or(ay + ah * 0.3).clamp(ay, (ay + ah - h_px).max(ay)),
+        ),
+    };
+    Some((
+        PhysicalSize::new(w_px.round() as u32, h_px.round() as u32),
+        PhysicalPosition::new((right - w_px - frame_border(w)).round() as i32, y.round() as i32),
+    ))
+}
+
+fn place_widget(app: &AppHandle) {
+    let Some(w) = widget(app) else { return };
+    let Some((size, pos)) = widget_target(app, &w) else { return };
+    let _ = w.set_size(size);
+    let _ = w.set_position(pos);
 }
 
 /// Windows가 창 좌우에 두는 보이지 않는 테두리 폭(px). set_position은 이 테두리 바깥 기준이라 보정에 필요
@@ -544,10 +563,17 @@ fn create_widget(app: &AppHandle) -> tauri::Result<()> {
                 // place_widget과 같은 기준(보이는 카드의 오른쪽 끝)으로 저장해야 전환할 때마다 위치가 밀리지 않음
                 let width = w.inner_size().map(|s| s.width as f64).unwrap_or(0.0);
                 let right = p.x as f64 + frame_border(&w) + width;
-                let st = state(&app);
-                let mut s = st.store.lock().unwrap();
-                s.position = Some(store::Position { right, y: p.y as f64 });
-                s.save();
+                let anchored = {
+                    let st = state(&app);
+                    let mut s = st.store.lock().unwrap();
+                    s.position = Some(store::Position { right, y: p.y as f64 });
+                    s.save();
+                    !s.anchor.is_empty()
+                };
+                // 고정 위치면 놓은 모니터의 모서리로 되돌림 (이미 그 자리면 그대로 → 이동 이벤트 반복 방지)
+                if anchored && widget_target(&app, &w).is_some_and(|(_, t)| t != p) {
+                    place_widget(&app);
+                }
             });
         }
     });
@@ -850,6 +876,21 @@ fn set_avatar_motion(app: AppHandle, on: bool) {
 }
 
 #[tauri::command]
+fn set_anchor(app: AppHandle, anchor: String) {
+    if !["", "tl", "tr", "bl", "br"].contains(&anchor.as_str()) {
+        return;
+    }
+    {
+        let st = state(&app);
+        let mut s = st.store.lock().unwrap();
+        s.anchor = anchor;
+        s.save();
+    }
+    place_widget(&app);
+    broadcast(&app);
+}
+
+#[tauri::command]
 fn set_auto_start(app: AppHandle, on: bool) {
     let al = app.autolaunch();
     let _ = if on { al.enable() } else { al.disable() };
@@ -995,6 +1036,7 @@ fn main() {
             set_interval,
             set_auto_start,
             set_avatar_motion,
+            set_anchor,
             set_mini,
             set_height,
             account_menu,

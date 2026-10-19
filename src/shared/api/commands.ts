@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
-import type { AppState, Catalog, MarketplaceAction, PluginAction, ProfilePatch } from "@/shared/types"
+import type { AppState, Catalog, MarketplaceAction, PluginAction, ProfilePatch, WidgetAnchor } from "@/shared/types"
 
 export const api = {
   // 상태
@@ -32,6 +32,7 @@ export const api = {
   setInterval: (min: number) => invoke<void>("set_interval", { min }),
   setAutoStart: (on: boolean) => invoke<void>("set_auto_start", { on }),
   setAvatarMotion: (on: boolean) => invoke<void>("set_avatar_motion", { on }),
+  setAnchor: (anchor: WidgetAnchor) => invoke<void>("set_anchor", { anchor }),
 
   // 앱 업데이트
   checkUpdate: () => invoke<void>("check_update_cmd"),

@@ -25,6 +25,9 @@ export type Profile = {
 
 export type ProfilePatch = Partial<Pick<Profile, "avatar" | "customAvatar" | "label">>
 
+/** 위젯 고정 위치. "" = 자유(드래그한 곳) */
+export type WidgetAnchor = "" | "tl" | "tr" | "bl" | "br"
+
 export type IntegrationKind = "mcp" | "plugin"
 /** missing: 예전에 있었는데 현재 계정에 없음 */
 export type IntegrationStatus = "ok" | "auth" | "fail" | "off" | "missing"
@@ -76,6 +79,7 @@ export type AppState = {
   mcpIntervalMin: number
   autoStart: boolean
   avatarMotion: boolean
+  anchor: WidgetAnchor
   mini: boolean
   update: UpdateInfo
 }
