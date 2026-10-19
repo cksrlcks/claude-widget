@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "claude-widget"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
