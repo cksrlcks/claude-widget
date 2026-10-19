@@ -64,6 +64,8 @@ pub struct Store {
     /// 사용량이 switch_prompt_at% 넘으면 Claude Code 세션 안에서 계정 전환을 물어봄 (훅)
     pub switch_prompt: bool,
     pub switch_prompt_at: u64,
+    /// 위젯·트레이에서 계정 전환 후 Claude 데스크톱 앱 재시작을 물어봄
+    pub restart_desktop: bool,
 }
 
 impl Default for Store {
@@ -79,6 +81,7 @@ impl Default for Store {
             anchor: String::new(),
             switch_prompt: false,
             switch_prompt_at: 90,
+            restart_desktop: true,
         }
     }
 }

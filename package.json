@@ -1,6 +1,6 @@
 {
   "name": "claude-widget",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Claude 계정/사용량/MCP 상태 플로팅 위젯",
   "scripts": {
     "dev": "tauri dev",

@@ -136,6 +136,7 @@ fn build_state(app: &AppHandle) -> Value {
         "anchor": s.anchor,
         "switchPrompt": s.switch_prompt,
         "switchPromptAt": s.switch_prompt_at,
+        "restartDesktop": s.restart_desktop,
         "autoStart": app.autolaunch().is_enabled().unwrap_or(false),
         "mini": rt.mini,
         "update": st.update.lock().unwrap().to_json(&app.package_info().version.to_string()),
@@ -337,6 +338,23 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
     if let Err(e) = apply_switch(&app, &target).await {
         app.dialog().message(e).title("전환 실패").kind(MessageDialogKind::Error).blocking_show();
         return false;
+    }
+    // 원격 /switch(remote_switch)에서는 물어볼 사람이 없으므로 여기(위젯·트레이 전환)에서만
+    if state(&app).store.lock().unwrap().restart_desktop
+        && tauri::async_runtime::spawn_blocking(claude::desktop_app_running).await.unwrap_or(false)
+    {
+        let ok = app
+            .dialog()
+            .message("Claude 앱을 재시작할까요?\n\nCode 탭 세션이 새 계정으로 시작됩니다.\n앱에서 진행 중인 작업은 중단됩니다. (채팅 로그인은 바뀌지 않음)")
+            .title("Claude 앱 재시작")
+            .kind(MessageDialogKind::Info)
+            .buttons(MessageDialogButtons::OkCancelCustom("재시작".into(), "나중에".into()))
+            .blocking_show();
+        if ok {
+            if let Err(e) = tauri::async_runtime::spawn_blocking(claude::restart_desktop_app).await.unwrap_or(Err("재시작 실패".into())) {
+                app.dialog().message(e).title("Claude 앱 재시작 실패").kind(MessageDialogKind::Error).blocking_show();
+            }
+        }
     }
     true
 }
@@ -945,6 +963,17 @@ fn set_switch_prompt(app: AppHandle, on: bool, at: f64) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_restart_desktop(app: AppHandle, on: bool) {
+    {
+        let st = state(&app);
+        let mut s = st.store.lock().unwrap();
+        s.restart_desktop = on;
+        s.save();
+    }
+    broadcast(&app);
+}
+
+#[tauri::command]
 fn set_auto_start(app: AppHandle, on: bool) {
     let al = app.autolaunch();
     let _ = if on { al.enable() } else { al.disable() };
@@ -1103,6 +1132,7 @@ fn main() {
             set_avatar_motion,
             set_anchor,
             set_switch_prompt,
+            set_restart_desktop,
             set_mini,
             set_height,
             account_menu,
