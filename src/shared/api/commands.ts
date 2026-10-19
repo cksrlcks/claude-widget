@@ -33,6 +33,7 @@ export const api = {
   setAutoStart: (on: boolean) => invoke<void>("set_auto_start", { on }),
   setAvatarMotion: (on: boolean) => invoke<void>("set_avatar_motion", { on }),
   setAnchor: (anchor: WidgetAnchor) => invoke<void>("set_anchor", { anchor }),
+  setSwitchPrompt: (on: boolean, at: number) => invoke<void>("set_switch_prompt", { on, at }),
 
   // 앱 업데이트
   checkUpdate: () => invoke<void>("check_update_cmd"),

@@ -80,6 +80,9 @@ export type AppState = {
   autoStart: boolean
   avatarMotion: boolean
   anchor: WidgetAnchor
+  /** 사용량이 switchPromptAt% 넘으면 Claude Code 세션 안에서 계정 전환을 물어봄 */
+  switchPrompt: boolean
+  switchPromptAt: number
   mini: boolean
   update: UpdateInfo
 }

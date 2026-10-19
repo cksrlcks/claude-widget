@@ -446,11 +446,14 @@ pub fn install_switch_command() {
     }
     // Bash 도구(Git Bash)에서 실행되므로 / 경로 사용
     let exe = exe.to_string_lossy().replace('\\', "/");
+    let log = crate::store::data_dir().join("remote-switch.log").to_string_lossy().replace('\\', "/");
+    // 위젯은 창 없는 앱이라 출력이 없음 → 위젯이 남긴 로그를 읽어 결과를 보여줌
     let body = format!(
-        "---\ndescription: Claude Widget으로 계정 전환 후 이 세션을 새 계정으로 원격 재실행 (예: /switch personal)\n\
-         argument-hint: <계정 라벨|이메일>\nallowed-tools: Bash\n---\n{SWITCH_MARK}\n\
-         !`\"{exe}\" switch $ARGUMENTS && echo \"전환 요청 보냄\"`\n\n\
-         계정 전환을 요청했습니다. 잠시 뒤 이 세션은 종료되고 새 계정으로 다시 뜹니다. \"전환 중\"이라고 한 줄만 답하세요.\n"
+        "---\ndescription: Claude Widget으로 계정 전환 후 이 세션을 새 계정으로 원격 재실행 (예: /switch personal, 비우면 다른 계정)\n\
+         argument-hint: [계정 라벨|이메일]\nallowed-tools: Bash\n---\n{SWITCH_MARK}\n\
+         !`rm -f \"{log}\"; \"{exe}\" switch $ARGUMENTS; sleep 3; cat \"{log}\" 2>/dev/null || echo \"위젯 응답 없음 (위젯이 켜져 있는지 확인)\"`\n\n\
+         위는 Claude Widget의 계정 전환 결과입니다. 결과를 사용자에게 한 줄로 그대로 전하세요. \
+         \"전환 시작\"이면 잠시 뒤 이 세션이 종료되고 새 계정으로 다시 뜬다고 덧붙이세요. 다른 작업은 하지 마세요.\n"
     );
     if old.as_deref() != Some(body.as_str()) {
         let _ = fs::create_dir_all(path.parent().unwrap());
@@ -472,5 +475,130 @@ mod tests {
         std::fs::write(&path, "user edit").unwrap();
         super::install_switch_command();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "user edit");
+
+        // 같은 테스트에서: USERPROFILE을 바꾸므로 병렬로 돌면 서로 간섭함
+        let settings = dir.join(".claude/settings.json");
+        let other = serde_json::json!({ "matcher": "Bash", "hooks": [{ "type": "command", "command": "gk hook" }] });
+        std::fs::write(&settings, serde_json::json!({ "model": "opus", "hooks": { "PostToolUse": [other] } }).to_string()).unwrap();
+        super::sync_usage_hook(true).unwrap();
+        super::sync_usage_hook(true).unwrap(); // 두 번 켜도 하나만
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(v["hooks"]["PostToolUse"].as_array().unwrap().len(), 2);
+        assert_eq!(v["hooks"]["UserPromptSubmit"].as_array().unwrap().len(), 1);
+        super::sync_usage_hook(false).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(v, serde_json::json!({ "model": "opus", "hooks": { "PostToolUse": [other] } }));
     }
+}
+
+// ---------- 사용량 경고 훅 (UserPromptSubmit / PostToolUse) ----------
+
+const HOOK_ARG: &str = "usage-hook";
+
+fn settings_path() -> PathBuf {
+    home().join(".claude").join("settings.json")
+}
+
+fn is_our_hook(group: &Value) -> bool {
+    group["hooks"].as_array().is_some_and(|hs| {
+        hs.iter().any(|h| h["command"].as_str().is_some_and(|c| c.contains("claude-widget") && c.ends_with(HOOK_ARG)))
+    })
+}
+
+/// ~/.claude/settings.json에 위젯 훅을 넣거나 뺌 (다른 훅·설정은 그대로)
+pub fn sync_usage_hook(enabled: bool) -> Result<(), String> {
+    let path = settings_path();
+    let mut settings = match fs::read_to_string(&path) {
+        Ok(t) => serde_json::from_str::<Value>(&t).map_err(|_| "settings.json 형식 오류 — 건드리지 않음")?,
+        Err(_) if !enabled => return Ok(()),
+        Err(_) => json!({}),
+    };
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?.to_string_lossy().replace('\\', "/");
+    let ours = |matcher: Option<&str>| {
+        let mut g = json!({ "hooks": [{ "type": "command", "command": format!("\"{exe}\" {HOOK_ARG}"), "timeout": 10 }] });
+        if let Some(m) = matcher {
+            g["matcher"] = json!(m);
+        }
+        g
+    };
+    let before = settings.clone();
+    let hooks = settings.as_object_mut().ok_or("settings.json 형식 오류")?.entry("hooks").or_insert_with(|| json!({}));
+    let hooks = hooks.as_object_mut().ok_or("settings.json hooks 형식 오류")?;
+    for (event, matcher) in [("UserPromptSubmit", None), ("PostToolUse", Some("*"))] {
+        let list = hooks.entry(event).or_insert_with(|| json!([]));
+        let Some(arr) = list.as_array_mut() else { continue };
+        arr.retain(|g| !is_our_hook(g));
+        if enabled {
+            arr.push(ours(matcher));
+        }
+        if arr.is_empty() {
+            hooks.remove(event);
+        }
+    }
+    if hooks.is_empty() {
+        settings.as_object_mut().unwrap().remove("hooks");
+    }
+    if settings == before {
+        return Ok(());
+    }
+    let _ = fs::create_dir_all(path.parent().unwrap());
+    write_json_atomic(&path, &settings)
+}
+
+/// 훅 본체: 현재 계정 사용량이 기준을 넘었으면 Claude에게 전환을 물어보라고 알림. 세션·초기화 주기당 한 번
+pub fn run_usage_hook() {
+    use std::io::Read;
+    let mut input = String::new();
+    let _ = std::io::stdin().read_to_string(&mut input);
+    let input: Value = serde_json::from_str(&input).unwrap_or(Value::Null);
+    if let Some(msg) = usage_hook_message(&input, &crate::store::Store::load()) {
+        let event = input["hook_event_name"].as_str().unwrap_or("UserPromptSubmit");
+        println!("{}", json!({ "hookSpecificOutput": { "hookEventName": event, "additionalContext": msg } }));
+    }
+}
+
+fn usage_hook_message(input: &Value, s: &crate::store::Store) -> Option<String> {
+    if !s.switch_prompt {
+        return None;
+    }
+    let active = read_live_auth()?["accountUuid"].as_str()?.to_string();
+    let me = s.profiles.iter().find(|p| p.id == active)?;
+    let usage = me.last_usage.as_ref()?;
+    let limit = s.switch_prompt_at as f64;
+    let (label, window) = [("세션(5시간)", &usage["session"]), ("주간", &usage["weekly"])]
+        .into_iter()
+        .find(|(_, w)| w["used"].as_f64().is_some_and(|u| u >= limit))?;
+    let others: Vec<String> = s
+        .profiles
+        .iter()
+        .filter(|p| p.id != active)
+        .map(|p| if p.label.is_empty() { p.email.clone() } else { format!("{} ({})", p.label, p.email) })
+        .collect();
+    if others.is_empty() {
+        return None;
+    }
+
+    // 같은 세션에서 같은 초기화 주기에는 한 번만
+    let key = format!("{}|{label}|{}", input["session_id"].as_str().unwrap_or(""), window["resetsAt"].as_str().unwrap_or(""));
+    let seen_path = crate::store::data_dir().join("usage-hook-seen.json");
+    let mut seen: Vec<String> = read_json(&seen_path).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
+    if seen.contains(&key) {
+        return None;
+    }
+    seen.push(key);
+    // shortcut: 최근 200개만 보관, 세션이 아주 많아지면 오래된 기록부터 잊음(그 세션에서 한 번 더 물어볼 수 있음)
+    let drop = seen.len().saturating_sub(200);
+    seen.drain(..drop);
+    let _ = fs::write(&seen_path, json!(seen).to_string());
+
+    let exe = std::env::current_exe().ok()?.to_string_lossy().replace('\\', "/");
+    Some(format!(
+        "[Claude Widget] 현재 계정({})의 {label} 사용량이 {:.0}%로 기준({limit:.0}%)을 넘었습니다. \
+         지금 하던 일을 계속하기 전에 사용자에게 다른 계정으로 전환할지 짧게 물어보세요. 전환 가능한 계정: {}. \
+         사용자가 동의하면 Bash로 `\"{exe}\" switch <라벨|이메일>`을 실행하세요 (계정이 2개면 인자 없이 실행해도 다른 계정으로 전환). \
+         실행하면 몇 초 뒤 이 세션이 종료되고 같은 대화가 새 계정으로 다시 뜹니다. 사용자가 원하지 않으면 하던 일을 계속하세요.",
+        me.email,
+        window["used"].as_f64().unwrap_or(0.0),
+        others.join(", ")
+    ))
 }

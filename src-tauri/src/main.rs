@@ -134,6 +134,8 @@ fn build_state(app: &AppHandle) -> Value {
         "mcpIntervalMin": s.mcp_interval_min,
         "avatarMotion": s.avatar_motion,
         "anchor": s.anchor,
+        "switchPrompt": s.switch_prompt,
+        "switchPromptAt": s.switch_prompt_at,
         "autoStart": app.autolaunch().is_enabled().unwrap_or(false),
         "mini": rt.mini,
         "update": st.update.lock().unwrap().to_json(&app.package_info().version.to_string()),
@@ -362,7 +364,8 @@ fn parse_switch(args: &[String]) -> Option<SwitchRequest> {
     let i = args.iter().position(|a| a == "switch")?;
     let flag = |name: &str| args.iter().position(|a| a == name).and_then(|j| args.get(j + 1)).cloned();
     Some(SwitchRequest {
-        profile: args.get(i + 1).filter(|a| !a.starts_with("--"))?.clone(),
+        // 비어 있으면 "다른 계정"으로 전환
+        profile: args.get(i + 1).filter(|a| !a.starts_with("--")).cloned().unwrap_or_default(),
         session: flag("--session"),
         caller: flag("--caller").and_then(|p| p.parse().ok()).unwrap_or(0),
     })
@@ -380,6 +383,21 @@ fn find_profile(app: &AppHandle, q: &str) -> Option<Profile> {
     }).cloned()
 }
 
+// 계정이 2개면 지금 계정이 아닌 쪽, 아니면 고르라고 안내
+fn other_profile(app: &AppHandle) -> Result<Profile, String> {
+    let active = state(app).rt.lock().unwrap().active_id.clone();
+    let profiles = state(app).store.lock().unwrap().profiles.clone();
+    let others: Vec<&Profile> = profiles.iter().filter(|p| Some(&p.id) != active.as_ref()).collect();
+    match others.as_slice() {
+        [one] => Ok((*one).clone()),
+        _ => {
+            let names: Vec<String> =
+                profiles.iter().map(|p| if p.label.is_empty() { p.email.clone() } else { format!("{} ({})", p.label, p.email) }).collect();
+            Err(format!("전환할 계정을 지정하세요: /switch <라벨|이메일> — {}", names.join(", ")))
+        }
+    }
+}
+
 async fn remote_switch(app: AppHandle, req: SwitchRequest, cwd: std::path::PathBuf) {
     if let Err(e) = remote_switch_inner(&app, req, cwd).await {
         remote_log(&format!("실패: {e}"));
@@ -388,7 +406,10 @@ async fn remote_switch(app: AppHandle, req: SwitchRequest, cwd: std::path::PathB
 
 async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path::PathBuf) -> Result<(), String> {
     let prev = sync_live_auth(app).ok_or("현재 로그인 정보 없음")?;
-    let meta = find_profile(app, &req.profile).ok_or(format!("계정 없음: {}", req.profile))?;
+    let meta = if req.profile.is_empty() { other_profile(app)? } else {
+        find_profile(app, &req.profile).ok_or(format!("계정 없음: {}", req.profile))?
+    };
+    remote_log(&format!("전환 시작: {}", meta.email));
     let target = store::load_secret(&meta.id).ok_or("저장된 계정 정보 없음")?;
     let session = match req.session {
         Some(s) if claude::valid_session_id(&s) => Some(s),
@@ -896,6 +917,20 @@ fn set_anchor(app: AppHandle, anchor: String) {
 }
 
 #[tauri::command]
+fn set_switch_prompt(app: AppHandle, on: bool, at: f64) -> Result<(), String> {
+    claude::sync_usage_hook(on)?;
+    {
+        let st = state(&app);
+        let mut s = st.store.lock().unwrap();
+        s.switch_prompt = on;
+        s.switch_prompt_at = at.round().clamp(50.0, 100.0) as u64;
+        s.save();
+    }
+    broadcast(&app);
+    Ok(())
+}
+
+#[tauri::command]
 fn set_auto_start(app: AppHandle, on: bool) {
     let al = app.autolaunch();
     let _ = if on { al.enable() } else { al.disable() };
@@ -987,6 +1022,10 @@ async fn store_marketplace(app: AppHandle, action: String, value: String) -> Val
 fn main() {
     // switch 명령: 자기를 부른 Claude Code의 pid를 붙여 다시 실행 (실행 중인 위젯이 받아 처리)
     let args: Vec<String> = std::env::args().collect();
+    // Claude Code 훅으로 불림: 위젯을 띄우지 않고 출력만 하고 종료
+    if args.get(1).map(String::as_str) == Some("usage-hook") {
+        return claude::run_usage_hook();
+    }
     if parse_switch(&args).is_some() && !args.iter().any(|a| a == "--caller") {
         let caller = claude::find_claude_ancestor(std::process::id()).unwrap_or(0);
         let _ = std::process::Command::new(&args[0]).args(&args[1..]).args(["--caller", &caller.to_string()]).spawn();
@@ -1043,6 +1082,7 @@ fn main() {
             set_auto_start,
             set_avatar_motion,
             set_anchor,
+            set_switch_prompt,
             set_mini,
             set_height,
             account_menu,
@@ -1059,6 +1099,8 @@ fn main() {
             let handle = app.handle().clone();
             create_widget(&handle)?;
             claude::install_switch_command();
+            // exe 경로가 바뀌었을 수 있어(업데이트·개발 모드) 시작할 때마다 다시 맞춤
+            let _ = claude::sync_usage_hook(state(&handle).store.lock().unwrap().switch_prompt);
             // 위젯이 꺼져 있을 때 switch 명령으로 시작된 경우
             if let Some(req) = parse_switch(&std::env::args().collect::<Vec<_>>()) {
                 let cwd = std::env::current_dir().unwrap_or_default();
@@ -1138,7 +1180,9 @@ mod tests {
         assert_eq!((r.profile.as_str(), r.session.as_deref(), r.caller), ("personal", Some("abc-1"), 42));
         let r = parse_switch(&a("exe switch me@x.com")).unwrap();
         assert_eq!((r.session, r.caller), (None, 0));
-        assert!(parse_switch(&a("exe switch --session x")).is_none());
+        let r = parse_switch(&a("exe switch --session x")).unwrap();
+        assert_eq!((r.profile.as_str(), r.session.as_deref()), ("", Some("x")));
+        assert_eq!(parse_switch(&a("exe switch")).unwrap().profile, "");
         assert!(parse_switch(&a("exe")).is_none());
     }
 }

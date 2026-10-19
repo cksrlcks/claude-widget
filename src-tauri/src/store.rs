@@ -61,6 +61,9 @@ pub struct Store {
     pub avatar_motion: bool,
     /// 고정 위치: "" (자유, 드래그한 곳) | "tl" | "tr" | "bl" | "br"
     pub anchor: String,
+    /// 사용량이 switch_prompt_at% 넘으면 Claude Code 세션 안에서 계정 전환을 물어봄 (훅)
+    pub switch_prompt: bool,
+    pub switch_prompt_at: u64,
 }
 
 impl Default for Store {
@@ -74,6 +77,8 @@ impl Default for Store {
             mcp_interval_min: 10,
             avatar_motion: true,
             anchor: String::new(),
+            switch_prompt: false,
+            switch_prompt_at: 90,
         }
     }
 }

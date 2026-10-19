@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -23,6 +24,22 @@ type Props = {
 export function GeneralSection({ state, className }: Props) {
   const [interval, setIntervalText] = useState(String(state.mcpIntervalMin))
   useEffect(() => setIntervalText(String(state.mcpIntervalMin)), [state.mcpIntervalMin])
+
+  const [promptAt, setPromptAt] = useState(String(state.switchPromptAt))
+  useEffect(() => setPromptAt(String(state.switchPromptAt)), [state.switchPromptAt])
+
+  const saveSwitchPrompt = async (on: boolean, at: number) => {
+    try {
+      await api.setSwitchPrompt(on, at)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+  const savePromptAt = () => {
+    const at = Math.max(50, Math.min(100, Number(promptAt) || 90))
+    if (at !== state.switchPromptAt) saveSwitchPrompt(state.switchPrompt, at)
+    else setPromptAt(String(at))
+  }
 
   const saveInterval = () => {
     const min = Math.max(1, Math.min(120, Number(interval) || 10))
@@ -68,6 +85,26 @@ export function GeneralSection({ state, className }: Props) {
         <Checkbox checked={state.avatarMotion} onCheckedChange={(v) => api.setAvatarMotion(v === true)} />
         아바타 움직임
       </label>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <Checkbox
+            checked={state.switchPrompt}
+            onCheckedChange={(v) => saveSwitchPrompt(v === true, state.switchPromptAt)}
+          />
+          사용량
+        </label>
+        <Input
+          type="number"
+          min={50}
+          max={100}
+          value={promptAt}
+          onChange={(e) => setPromptAt(e.target.value)}
+          onBlur={savePromptAt}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          className="w-16"
+        />
+        % 넘으면 Claude Code 세션에서 계정 전환 물어보기
+      </div>
     </Section>
   )
 }
