@@ -425,13 +425,46 @@ pub fn kill_tree(pid: u32) {
 /// (--name은 붙이지 않음: 같은 세션을 이어갈 때 원래 대화 제목을 덮어씀)
 pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::process::Child, String> {
     const CREATE_NEW_CONSOLE: u32 = 0x10;
+    // 시작 시 확인 질문이 뜨면 아무도 답할 수 없어 Remote Control 등록 전에 멈춤 → 질문을 띄우는 설정을 미리 꺼 둠
+    let settings = unattended_settings(cwd);
     Command::new("cmd")
         .args(["/c", "claude", "--resume", session, "--remote-control"])
         .args(fork.then_some("--fork-session"))
+        .args(settings.iter().flat_map(|p| ["--settings".into(), p.to_string_lossy().to_string()]))
         .current_dir(cwd)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
         .map_err(|e| e.to_string())
+}
+
+/// 다시 띄울 세션용 설정 파일: 아직 승인 안 한 프로젝트 MCP 서버(.mcp.json)를 꺼서 "새 MCP 서버 발견" 질문을 막음.
+/// 원래 세션에서도 승인 전이라 안 쓰던 서버들이므로 동작은 같음
+fn unattended_settings(cwd: &Path) -> Option<PathBuf> {
+    let mcp = read_json(&cwd.join(".mcp.json"))?;
+    let off = unapproved_mcp(&mcp, &read_json(&config_path()).unwrap_or(Value::Null), cwd);
+    if off.is_empty() {
+        return None;
+    }
+    let path = crate::store::data_dir().join("relaunch-settings.json");
+    fs::write(&path, json!({ "disabledMcpjsonServers": off }).to_string()).ok()?;
+    Some(path)
+}
+
+fn unapproved_mcp(mcp_json: &Value, claude_json: &Value, cwd: &Path) -> Vec<String> {
+    let norm = |p: &str| p.replace('\\', "/").trim_end_matches('/').to_lowercase();
+    let here = norm(&cwd.to_string_lossy());
+    let project = claude_json["projects"]
+        .as_object()
+        .and_then(|ps| ps.iter().find(|(k, _)| norm(k) == here).map(|(_, v)| v.clone()))
+        .unwrap_or(Value::Null);
+    if project["enableAllProjectMcpServers"] == Value::Bool(true) {
+        return vec![];
+    }
+    let approved: Vec<&str> = project["enabledMcpjsonServers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str()).collect()).unwrap_or_default();
+    mcp_json["mcpServers"]
+        .as_object()
+        .map(|m| m.keys().filter(|k| !approved.contains(&k.as_str())).cloned().collect())
+        .unwrap_or_default()
 }
 
 const SWITCH_MARK: &str = "<!-- claude-widget: 이 줄을 지우면 위젯이 이 파일을 다시 쓰지 않습니다 -->";
@@ -462,6 +495,17 @@ pub fn install_switch_command() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn unapproved_mcp_skips_approved() {
+        use serde_json::json;
+        let mcp = json!({ "mcpServers": { "a": {}, "b": {} } });
+        let cfg = json!({ "projects": { "D:/proj": { "enabledMcpjsonServers": ["a"] } } });
+        assert_eq!(super::unapproved_mcp(&mcp, &cfg, std::path::Path::new("D:\\proj")), vec!["b"]);
+        let all = json!({ "projects": { "D:/proj": { "enableAllProjectMcpServers": true } } });
+        assert!(super::unapproved_mcp(&mcp, &all, std::path::Path::new("D:\\proj")).is_empty());
+        assert_eq!(super::unapproved_mcp(&mcp, &json!({}), std::path::Path::new("D:\\proj")).len(), 2);
+    }
+
     #[test]
     fn switch_command_respects_user_edits() {
         let dir = std::env::temp_dir().join("cw-switch-test");
