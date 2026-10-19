@@ -378,3 +378,58 @@ pub fn count_claude_processes() -> usize {
         .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok())
         .unwrap_or(0)
 }
+
+// ---------- 원격 세션 전환 ----------
+
+/// pid부터 부모를 따라 올라가며 가장 가까운 Claude Code(claude.exe) pid를 찾음 (데스크톱 앱 Claude.exe 제외)
+pub fn find_claude_ancestor(pid: u32) -> Option<u32> {
+    let ps = format!(
+        "$all=@{{}}; Get-CimInstance Win32_Process | % {{ $all[[int]$_.ProcessId]=$_ }}; $id={pid}; \
+         for($i=0;$i -lt 16;$i++){{ $p=$all[[int]$id]; if(!$p){{break}}; \
+         if($p.Name -eq 'claude.exe' -and $p.ExecutablePath -notlike '*\\WindowsApps\\*'){{ $p.ProcessId; break }}; \
+         $id=$p.ParentProcessId }}"
+    );
+    let out = Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&out.stdout).trim().parse().ok()
+}
+
+pub fn valid_session_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// cwd 프로젝트에서 가장 최근에 기록된 세션 (= 지금 명령을 실행 중인 세션)
+pub fn newest_session(cwd: &Path) -> Option<String> {
+    let key: String = cwd.to_string_lossy().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    let dir = home().join(".claude").join("projects").join(key);
+    fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("jsonl"))
+        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+        .and_then(|e| e.path().file_stem().map(|s| s.to_string_lossy().to_string()))
+        .filter(|s| valid_session_id(s))
+}
+
+pub fn kill_tree(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+/// 새 콘솔 창에서 `claude --resume <id> --remote-control --name <name>` 실행
+pub fn launch_remote(cwd: &Path, session: &str, name: &str) -> Result<std::process::Child, String> {
+    const CREATE_NEW_CONSOLE: u32 = 0x10;
+    // cmd /c로 실행되므로 이름에서 셸 특수문자 제거
+    let name: String = name.chars().filter(|c| c.is_alphanumeric() || " _.@-".contains(*c)).collect();
+    Command::new("cmd")
+        .args(["/c", "claude", "--resume", session, "--remote-control", "--name", name.trim()])
+        .current_dir(cwd)
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .spawn()
+        .map_err(|e| e.to_string())
+}

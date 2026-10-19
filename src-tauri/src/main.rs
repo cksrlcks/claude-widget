@@ -331,16 +331,96 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
         }
     }
 
-    sync_live_auth(&app); // 현재 계정의 최신 토큰을 먼저 저장
-    claude::backup_live_files(&store::backup_dir());
-    if let Err(e) = claude::apply_auth(&target) {
+    if let Err(e) = apply_switch(&app, &target).await {
         app.dialog().message(e).title("전환 실패").kind(MessageDialogKind::Error).blocking_show();
         return false;
     }
-    state(&app).rt.lock().unwrap().usage_fetched_at = 0.0;
-    refresh_status(app.clone(), true).await;
-    spawn_check(&app);
     true
+}
+
+async fn apply_switch(app: &AppHandle, target: &Value) -> Result<(), String> {
+    sync_live_auth(app); // 현재 계정의 최신 토큰을 먼저 저장
+    claude::backup_live_files(&store::backup_dir());
+    claude::apply_auth(target)?;
+    state(app).rt.lock().unwrap().usage_fetched_at = 0.0;
+    refresh_status(app.clone(), true).await;
+    spawn_check(app);
+    Ok(())
+}
+
+// ---------- 원격 세션 전환 (CLI: claude-widget switch <계정> [--session <id>]) ----------
+// Remote Control 세션 안의 Claude가 실행 → 계정 교체 → 그 Claude 종료 → 같은 대화를 새 계정으로 --remote-control 재실행
+
+struct SwitchRequest {
+    profile: String,
+    session: Option<String>,
+    caller: u32,
+}
+
+fn parse_switch(args: &[String]) -> Option<SwitchRequest> {
+    let i = args.iter().position(|a| a == "switch")?;
+    let flag = |name: &str| args.iter().position(|a| a == name).and_then(|j| args.get(j + 1)).cloned();
+    Some(SwitchRequest {
+        profile: args.get(i + 1).filter(|a| !a.starts_with("--"))?.clone(),
+        session: flag("--session"),
+        caller: flag("--caller").and_then(|p| p.parse().ok()).unwrap_or(0),
+    })
+}
+
+fn remote_log(msg: &str) {
+    let _ = std::fs::create_dir_all(store::data_dir());
+    let _ = std::fs::write(store::data_dir().join("remote-switch.log"), format!("{} {msg}\n", claude::now_ms() as u64));
+}
+
+fn find_profile(app: &AppHandle, q: &str) -> Option<Profile> {
+    let q = q.to_lowercase();
+    state(app).store.lock().unwrap().profiles.iter().find(|p| {
+        [&p.label, &p.email, &p.id].iter().any(|v| v.to_lowercase() == q)
+    }).cloned()
+}
+
+async fn remote_switch(app: AppHandle, req: SwitchRequest, cwd: std::path::PathBuf) {
+    if let Err(e) = remote_switch_inner(&app, req, cwd).await {
+        remote_log(&format!("실패: {e}"));
+    }
+}
+
+async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path::PathBuf) -> Result<(), String> {
+    let prev = sync_live_auth(app).ok_or("현재 로그인 정보 없음")?;
+    let meta = find_profile(app, &req.profile).ok_or(format!("계정 없음: {}", req.profile))?;
+    let target = store::load_secret(&meta.id).ok_or("저장된 계정 정보 없음")?;
+    let session = match req.session {
+        Some(s) if claude::valid_session_id(&s) => Some(s),
+        Some(s) => return Err(format!("잘못된 세션 ID: {s}")),
+        None if req.caller > 0 => claude::newest_session(&cwd),
+        None => None,
+    };
+    if req.caller > 0 && session.is_none() {
+        return Err(format!("세션을 찾지 못함: {}", cwd.display()));
+    }
+    apply_switch(app, &target).await?;
+    let (Some(session), true) = (session, req.caller > 0) else {
+        remote_log(&format!("전환됨: {}", meta.email));
+        return Ok(());
+    };
+
+    // 원격 화면에 Claude의 답이 전달될 시간을 준 뒤 종료
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    claude::kill_tree(req.caller);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let name = |p: &Profile| if p.label.is_empty() { p.email.clone() } else { p.label.clone() };
+    let mut child = claude::launch_remote(&cwd, &session, &name(&meta))?;
+
+    // shortcut: 프로세스가 30초 안에 죽은 경우만 롤백, Remote Control 등록 실패(프로세스는 살아 있음)는 감지 못 함
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    if child.try_wait().ok().flatten().is_none() {
+        remote_log(&format!("전환됨: {} / 세션 {session}", meta.email));
+        return Ok(());
+    }
+    apply_switch(app, &prev).await?;
+    let prev_meta = find_profile(app, prev["accountUuid"].as_str().unwrap_or("")).unwrap_or_default();
+    claude::launch_remote(&cwd, &session, &name(&prev_meta))?;
+    Err(format!("{} 계정으로 실행 실패 → 이전 계정으로 롤백", meta.email))
 }
 
 fn switch_account(app: &AppHandle, id: String) {
@@ -858,11 +938,20 @@ async fn store_marketplace(app: AppHandle, action: String, value: String) -> Val
 }
 
 fn main() {
+    // switch 명령: 자기를 부른 Claude Code의 pid를 붙여 다시 실행 (실행 중인 위젯이 받아 처리)
+    let args: Vec<String> = std::env::args().collect();
+    if parse_switch(&args).is_some() && !args.iter().any(|a| a == "--caller") {
+        let caller = claude::find_claude_ancestor(std::process::id()).unwrap_or(0);
+        let _ = std::process::Command::new(&args[0]).args(&args[1..]).args(["--caller", &caller.to_string()]).spawn();
+        return;
+    }
     store::migrate_electron_secrets();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(w) = widget(app) {
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            if let Some(req) = parse_switch(&args) {
+                tauri::async_runtime::spawn(remote_switch(app.clone(), req, cwd.into()));
+            } else if let Some(w) = widget(app) {
                 let _ = w.show();
             }
         }))
@@ -921,6 +1010,11 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             create_widget(&handle)?;
+            // 위젯이 꺼져 있을 때 switch 명령으로 시작된 경우
+            if let Some(req) = parse_switch(&std::env::args().collect::<Vec<_>>()) {
+                let cwd = std::env::current_dir().unwrap_or_default();
+                tauri::async_runtime::spawn(remote_switch(handle.clone(), req, cwd));
+            }
 
             let tray_icon = Image::from_bytes(include_bytes!("../../assets/tray@2x.png"))?;
             TrayIconBuilder::with_id("main")
@@ -982,4 +1076,20 @@ fn main() {
                 api.prevent_exit();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_switch;
+
+    #[test]
+    fn parses_switch_args() {
+        let a = |s: &str| s.split(' ').map(String::from).collect::<Vec<_>>();
+        let r = parse_switch(&a("exe switch personal --session abc-1 --caller 42")).unwrap();
+        assert_eq!((r.profile.as_str(), r.session.as_deref(), r.caller), ("personal", Some("abc-1"), 42));
+        let r = parse_switch(&a("exe switch me@x.com")).unwrap();
+        assert_eq!((r.session, r.caller), (None, 0));
+        assert!(parse_switch(&a("exe switch --session x")).is_none());
+        assert!(parse_switch(&a("exe")).is_none());
+    }
 }

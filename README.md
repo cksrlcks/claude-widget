@@ -28,6 +28,22 @@ npm run dev
 npm run build
 ```
 
+## 원격 세션 계정 전환
+
+Remote Control로 보고 있는 세션을 다른 계정으로 이어가기. 원격 세션 안에서 Claude에게 이렇게 시킨다:
+
+```
+"%LOCALAPPDATA%\Claude Widget\claude-widget.exe" switch <계정 라벨|이메일> [--session <세션ID>]
+```
+
+1. 위젯이 계정을 교체 (확인창 없음)
+2. 5초 뒤 명령을 실행한 Claude Code 프로세스를 종료
+3. 새 콘솔 창에서 `claude --resume <세션ID> --remote-control --name <계정>`으로 같은 대화를 재실행 → 새 계정의 claude.ai/code에서 이어감
+4. 30초 안에 프로세스가 죽으면 이전 계정으로 롤백 후 재실행
+
+세션 ID를 안 주면 현재 폴더 프로젝트에서 가장 최근 세션을 쓴다. 결과는 `%APPDATA%\claude-widget\remote-switch.log`에 남는다.
+전역 크리덴셜을 바꾸므로 그 PC의 다른 세션도 재시작하면 새 계정이 된다.
+
 ## 구조
 
 ```
