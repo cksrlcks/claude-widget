@@ -421,13 +421,13 @@ pub fn kill_tree(pid: u32) {
         .status();
 }
 
-/// 새 콘솔 창에서 `claude --resume <id> --remote-control --name <name>` 실행
-pub fn launch_remote(cwd: &Path, session: &str, name: &str) -> Result<std::process::Child, String> {
+/// 새 콘솔 창에서 `claude --resume <id> --remote-control` 실행. fork면 대화를 복사한 새 세션으로
+/// (--name은 붙이지 않음: 같은 세션을 이어갈 때 원래 대화 제목을 덮어씀)
+pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::process::Child, String> {
     const CREATE_NEW_CONSOLE: u32 = 0x10;
-    // cmd /c로 실행되므로 이름에서 셸 특수문자 제거
-    let name: String = name.chars().filter(|c| c.is_alphanumeric() || " _.@-".contains(*c)).collect();
     Command::new("cmd")
-        .args(["/c", "claude", "--resume", session, "--remote-control", "--name", name.trim()])
+        .args(["/c", "claude", "--resume", session, "--remote-control"])
+        .args(fork.then_some("--fork-session"))
         .current_dir(cwd)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
@@ -452,8 +452,7 @@ pub fn install_switch_command() {
         "---\ndescription: Claude Widget으로 계정 전환 후 이 세션을 새 계정으로 원격 재실행 (예: /switch personal, 비우면 다른 계정)\n\
          argument-hint: [계정 라벨|이메일]\nallowed-tools: Bash\n---\n{SWITCH_MARK}\n\
          !`rm -f \"{log}\"; \"{exe}\" switch $ARGUMENTS; sleep 3; cat \"{log}\" 2>/dev/null || echo \"위젯 응답 없음 (위젯이 켜져 있는지 확인)\"`\n\n\
-         위는 Claude Widget의 계정 전환 결과입니다. 결과를 사용자에게 한 줄로 그대로 전하세요. \
-         \"전환 시작\"이면 잠시 뒤 이 세션이 종료되고 새 계정으로 다시 뜬다고 덧붙이세요. 다른 작업은 하지 마세요.\n"
+         위는 Claude Widget의 계정 전환 결과입니다. 결과 문장을 사용자에게 그대로 전하세요. 다른 작업은 하지 마세요.\n"
     );
     if old.as_deref() != Some(body.as_str()) {
         let _ = fs::create_dir_all(path.parent().unwrap());
@@ -592,11 +591,13 @@ fn usage_hook_message(input: &Value, s: &crate::store::Store) -> Option<String> 
     let _ = fs::write(&seen_path, json!(seen).to_string());
 
     let exe = std::env::current_exe().ok()?.to_string_lossy().replace('\\', "/");
+    let log = crate::store::data_dir().join("remote-switch.log").to_string_lossy().replace('\\', "/");
     Some(format!(
         "[Claude Widget] 현재 계정({})의 {label} 사용량이 {:.0}%로 기준({limit:.0}%)을 넘었습니다. \
          지금 하던 일을 계속하기 전에 사용자에게 다른 계정으로 전환할지 짧게 물어보세요. 전환 가능한 계정: {}. \
-         사용자가 동의하면 Bash로 `\"{exe}\" switch <라벨|이메일>`을 실행하세요 (계정이 2개면 인자 없이 실행해도 다른 계정으로 전환). \
-         실행하면 몇 초 뒤 이 세션이 종료되고 같은 대화가 새 계정으로 다시 뜹니다. 사용자가 원하지 않으면 하던 일을 계속하세요.",
+         사용자가 동의하면 Bash로 `\"{exe}\" switch <라벨|이메일>; sleep 3; cat \"{log}\"`을 실행하고 \
+         (계정이 2개면 <라벨|이메일>을 비워도 다른 계정으로 전환) 출력된 결과 문장을 사용자에게 그대로 전하세요. \
+         사용자가 원하지 않으면 하던 일을 계속하세요.",
         me.email,
         window["used"].as_f64().unwrap_or(0.0),
         others.join(", ")

@@ -358,6 +358,8 @@ struct SwitchRequest {
     profile: String,
     session: Option<String>,
     caller: u32,
+    /// VS Code·데스크톱 앱 세션: 죽이면 패널이 깨지므로 대화를 복사(--fork-session)해 새 세션으로 염
+    fork: bool,
 }
 
 fn parse_switch(args: &[String]) -> Option<SwitchRequest> {
@@ -368,6 +370,7 @@ fn parse_switch(args: &[String]) -> Option<SwitchRequest> {
         profile: args.get(i + 1).filter(|a| !a.starts_with("--")).cloned().unwrap_or_default(),
         session: flag("--session"),
         caller: flag("--caller").and_then(|p| p.parse().ok()).unwrap_or(0),
+        fork: flag("--entry").is_some_and(|e| e != "cli"),
     })
 }
 
@@ -409,39 +412,50 @@ async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path
     let meta = if req.profile.is_empty() { other_profile(app)? } else {
         find_profile(app, &req.profile).ok_or(format!("계정 없음: {}", req.profile))?
     };
-    remote_log(&format!("전환 시작: {}", meta.email));
     let target = store::load_secret(&meta.id).ok_or("저장된 계정 정보 없음")?;
+    let relaunch = req.caller > 0 || req.fork;
     let session = match req.session {
         Some(s) if claude::valid_session_id(&s) => Some(s),
         Some(s) => return Err(format!("잘못된 세션 ID: {s}")),
-        None if req.caller > 0 => claude::newest_session(&cwd),
+        None if relaunch => claude::newest_session(&cwd),
         None => None,
     };
-    if req.caller > 0 && session.is_none() {
+    if relaunch && session.is_none() {
         return Err(format!("세션을 찾지 못함: {}", cwd.display()));
     }
+    remote_log(&match (&session, req.fork) {
+        (None, _) => format!("전환 시작: {}", meta.email),
+        (Some(_), false) => format!("전환 시작: {} — 잠시 뒤 이 세션이 종료되고 새 계정으로 다시 뜹니다", meta.email),
+        (Some(_), true) => format!(
+            "전환 시작: {} — 이 대화를 복사한 같은 제목의 새 세션이 새 계정으로 열립니다. 원격에서는 새 계정의 세션 목록에서 그 세션으로 옮겨 가세요 (이 세션은 그대로 남음)",
+            meta.email
+        ),
+    });
     apply_switch(app, &target).await?;
-    let (Some(session), true) = (session, req.caller > 0) else {
+    let Some(session) = session else {
         remote_log(&format!("전환됨: {}", meta.email));
         return Ok(());
     };
 
-    // 원격 화면에 Claude의 답이 전달될 시간을 준 뒤 종료
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    claude::kill_tree(req.caller);
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    let name = |p: &Profile| if p.label.is_empty() { p.email.clone() } else { p.label.clone() };
-    let mut child = claude::launch_remote(&cwd, &session, &name(&meta))?;
+    if !req.fork {
+        // 원격 화면에 Claude의 답이 전달될 시간을 준 뒤 종료
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        claude::kill_tree(req.caller);
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+    let mut child = claude::launch_remote(&cwd, &session, req.fork)?;
 
     // shortcut: 프로세스가 30초 안에 죽은 경우만 롤백, Remote Control 등록 실패(프로세스는 살아 있음)는 감지 못 함
     tokio::time::sleep(Duration::from_secs(30)).await;
     if child.try_wait().ok().flatten().is_none() {
-        remote_log(&format!("전환됨: {} / 세션 {session}", meta.email));
+        remote_log(&format!("전환됨: {} / 세션 {session}{}", meta.email, if req.fork { " (복사본)" } else { "" }));
         return Ok(());
     }
     apply_switch(app, &prev).await?;
-    let prev_meta = find_profile(app, prev["accountUuid"].as_str().unwrap_or("")).unwrap_or_default();
-    claude::launch_remote(&cwd, &session, &name(&prev_meta))?;
+    if !req.fork {
+        // 원래 세션은 이미 종료했으므로 이전 계정으로 다시 띄움 (복사 모드는 원래 세션이 살아 있어 불필요)
+        claude::launch_remote(&cwd, &session, false)?;
+    }
     Err(format!("{} 계정으로 실행 실패 → 이전 계정으로 롤백", meta.email))
 }
 
@@ -1028,7 +1042,13 @@ fn main() {
     }
     if parse_switch(&args).is_some() && !args.iter().any(|a| a == "--caller") {
         let caller = claude::find_claude_ancestor(std::process::id()).unwrap_or(0);
-        let _ = std::process::Command::new(&args[0]).args(&args[1..]).args(["--caller", &caller.to_string()]).spawn();
+        let mut cmd = std::process::Command::new(&args[0]);
+        cmd.args(&args[1..]).args(["--caller", &caller.to_string()]);
+        // 어디서 실행된 세션인지 (cli / claude-vscode / claude-desktop ...)
+        if let Ok(entry) = std::env::var("CLAUDE_CODE_ENTRYPOINT") {
+            cmd.args(["--entry", &entry]);
+        }
+        let _ = cmd.spawn();
         return;
     }
     store::migrate_electron_secrets();
@@ -1183,6 +1203,9 @@ mod tests {
         let r = parse_switch(&a("exe switch --session x")).unwrap();
         assert_eq!((r.profile.as_str(), r.session.as_deref()), ("", Some("x")));
         assert_eq!(parse_switch(&a("exe switch")).unwrap().profile, "");
+        assert!(parse_switch(&a("exe switch --caller 1 --entry claude-vscode")).unwrap().fork);
+        assert!(!parse_switch(&a("exe switch --caller 1 --entry cli")).unwrap().fork);
+        assert!(!parse_switch(&a("exe switch --caller 1")).unwrap().fork);
         assert!(parse_switch(&a("exe")).is_none());
     }
 }
