@@ -30,7 +30,10 @@ npm run build
 
 ## 원격 세션 계정 전환
 
-Remote Control로 보고 있는 세션을 다른 계정으로 이어가기. 원격 세션 안에서 Claude에게 이렇게 시킨다:
+Remote Control로 보고 있는 세션을 다른 계정으로 이어가기. 원격 세션에서 `/switch <계정 라벨|이메일>`을 입력한다.
+
+위젯이 시작할 때 `~/.claude/commands/switch.md`를 자동으로 만든다 (파일 안의 `claude-widget` 표시 줄을 지우면 더 이상 덮어쓰지 않음).
+명령은 모델 호출 전에 실행되므로 사용량 한도에 걸린 상태에서도 동작할 가능성이 높다. 직접 실행하려면:
 
 ```
 "%LOCALAPPDATA%\Claude Widget\claude-widget.exe" switch <계정 라벨|이메일> [--session <세션ID>]

@@ -1010,6 +1010,7 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             create_widget(&handle)?;
+            claude::install_switch_command();
             // 위젯이 꺼져 있을 때 switch 명령으로 시작된 경우
             if let Some(req) = parse_switch(&std::env::args().collect::<Vec<_>>()) {
                 let cwd = std::env::current_dir().unwrap_or_default();

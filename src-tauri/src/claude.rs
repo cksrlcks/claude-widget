@@ -433,3 +433,44 @@ pub fn launch_remote(cwd: &Path, session: &str, name: &str) -> Result<std::proce
         .spawn()
         .map_err(|e| e.to_string())
 }
+
+const SWITCH_MARK: &str = "<!-- claude-widget: 이 줄을 지우면 위젯이 이 파일을 다시 쓰지 않습니다 -->";
+
+/// ~/.claude/commands/switch.md 설치 (없거나 위젯이 만든 파일이면 현재 exe 경로로 갱신)
+pub fn install_switch_command() {
+    let Ok(exe) = std::env::current_exe() else { return };
+    let path = home().join(".claude").join("commands").join("switch.md");
+    let old = fs::read_to_string(&path).ok();
+    if old.as_ref().is_some_and(|t| !t.contains(SWITCH_MARK)) {
+        return;
+    }
+    // Bash 도구(Git Bash)에서 실행되므로 / 경로 사용
+    let exe = exe.to_string_lossy().replace('\\', "/");
+    let body = format!(
+        "---\ndescription: Claude Widget으로 계정 전환 후 이 세션을 새 계정으로 원격 재실행 (예: /switch personal)\n\
+         argument-hint: <계정 라벨|이메일>\nallowed-tools: Bash\n---\n{SWITCH_MARK}\n\
+         !`\"{exe}\" switch $ARGUMENTS && echo \"전환 요청 보냄\"`\n\n\
+         계정 전환을 요청했습니다. 잠시 뒤 이 세션은 종료되고 새 계정으로 다시 뜹니다. \"전환 중\"이라고 한 줄만 답하세요.\n"
+    );
+    if old.as_deref() != Some(body.as_str()) {
+        let _ = fs::create_dir_all(path.parent().unwrap());
+        let _ = fs::write(&path, body);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn switch_command_respects_user_edits() {
+        let dir = std::env::temp_dir().join("cw-switch-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::env::set_var("USERPROFILE", &dir);
+        let path = dir.join(".claude/commands/switch.md");
+        super::install_switch_command();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains(" switch $ARGUMENTS") && !text.contains('\\'));
+        std::fs::write(&path, "user edit").unwrap();
+        super::install_switch_command();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "user edit");
+    }
+}
