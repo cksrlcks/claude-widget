@@ -46,7 +46,7 @@ export function GeneralSection({ state, className }: Props) {
         />
         분
       </label>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1">위젯 위치</span>
         {ANCHORS.map((a) => (
           <Button
