@@ -379,38 +379,6 @@ pub fn count_claude_processes() -> usize {
         .unwrap_or(0)
 }
 
-// Claude 데스크톱 앱(MSIX, WindowsApps). 패키지 폴더 이름 "Claude_<버전>_x64__<게시자ID>" → 패키지 패밀리 "Claude_<게시자ID>"
-const DESKTOP_APP_PS: &str = r#"
-$p = @(Get-Process Claude -ErrorAction SilentlyContinue | ? { $_.Path -like '*\WindowsApps\Claude_*' })
-if (!$p) { exit 1 }
-$n = Split-Path -Leaf (Split-Path (Split-Path $p[0].Path))
-$fam = $n.Split('_')[0] + '_' + ($n -split '__')[-1]
-"#;
-
-pub fn desktop_app_running() -> bool {
-    run_ps(DESKTOP_APP_PS).is_ok()
-}
-
-/// 데스크톱 앱 재시작: Code 탭 세션이 ~/.claude의 새 계정으로 다시 시작됨 (채팅 쪽 로그인은 앱 자체 로그인이라 그대로)
-pub fn restart_desktop_app() -> Result<(), String> {
-    run_ps(&format!(
-        "{DESKTOP_APP_PS}$p | Stop-Process -Force\nStart-Sleep -Seconds 2\nStart-Process \"shell:AppsFolder\\$fam!Claude\""
-    ))
-}
-
-fn run_ps(script: &str) -> Result<(), String> {
-    let out = Command::new("powershell")
-        .args(["-NoProfile", "-Command", script])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
-    }
-}
-
 // ---------- 원격 세션 전환 ----------
 
 /// pid부터 부모를 따라 올라가며 가장 가까운 Claude Code(claude.exe) pid를 찾음 (데스크톱 앱 Claude.exe 제외)

@@ -83,8 +83,6 @@ export type AppState = {
   /** 사용량이 switchPromptAt% 넘으면 Claude Code 세션 안에서 계정 전환을 물어봄 */
   switchPrompt: boolean
   switchPromptAt: number
-  /** 위젯·트레이에서 계정 전환 후 Claude 데스크톱 앱 재시작을 물어봄 */
-  restartDesktop: boolean
   mini: boolean
   update: UpdateInfo
 }

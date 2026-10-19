@@ -34,7 +34,6 @@ export const api = {
   setAvatarMotion: (on: boolean) => invoke<void>("set_avatar_motion", { on }),
   setAnchor: (anchor: WidgetAnchor) => invoke<void>("set_anchor", { anchor }),
   setSwitchPrompt: (on: boolean, at: number) => invoke<void>("set_switch_prompt", { on, at }),
-  setRestartDesktop: (on: boolean) => invoke<void>("set_restart_desktop", { on }),
 
   // 앱 업데이트
   checkUpdate: () => invoke<void>("check_update_cmd"),

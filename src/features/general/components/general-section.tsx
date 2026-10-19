@@ -105,10 +105,6 @@ export function GeneralSection({ state, className }: Props) {
         />
         % 넘으면 Claude Code 세션에서 계정 전환 물어보기
       </div>
-      <label className="flex w-fit cursor-pointer items-center gap-2.5">
-        <Checkbox checked={state.restartDesktop} onCheckedChange={(v) => api.setRestartDesktop(v === true)} />
-        계정 전환 후 Claude 앱 재시작 물어보기
-      </label>
     </Section>
   )
 }
