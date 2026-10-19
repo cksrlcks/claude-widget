@@ -402,10 +402,13 @@ pub fn valid_session_id(id: &str) -> bool {
 }
 
 /// cwd 프로젝트에서 가장 최근에 기록된 세션 (= 지금 명령을 실행 중인 세션)
-pub fn newest_session(cwd: &Path) -> Option<String> {
+fn project_dir(cwd: &Path) -> PathBuf {
     let key: String = cwd.to_string_lossy().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
-    let dir = home().join(".claude").join("projects").join(key);
-    fs::read_dir(dir)
+    home().join(".claude").join("projects").join(key)
+}
+
+pub fn newest_session(cwd: &Path) -> Option<String> {
+    fs::read_dir(project_dir(cwd))
         .ok()?
         .flatten()
         .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("jsonl"))
@@ -427,14 +430,33 @@ pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::proce
     const CREATE_NEW_CONSOLE: u32 = 0x10;
     // 시작 시 확인 질문이 뜨면 아무도 답할 수 없어 Remote Control 등록 전에 멈춤 → 질문을 띄우는 설정을 미리 꺼 둠
     let settings = unattended_settings(cwd);
+    // 원격 목록 이름: 없으면 PC 이름으로 뜸. --remote-control <이름>은 원격 쪽 이름만 정하고 대화 제목은 그대로 둠
+    let title = fs::read_to_string(project_dir(cwd).join(format!("{session}.jsonl"))).ok().and_then(|t| session_title(&t));
     Command::new("cmd")
         .args(["/c", "claude", "--resume", session, "--remote-control"])
+        .args(title)
         .args(fork.then_some("--fork-session"))
         .args(settings.iter().flat_map(|p| ["--settings".into(), p.to_string_lossy().to_string()]))
         .current_dir(cwd)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
         .map_err(|e| e.to_string())
+}
+
+/// 대화 기록(jsonl)의 제목: 마지막 custom-title(직접 지정), 없으면 마지막 ai-title. cmd /c로 넘기므로 셸 특수문자 제거
+fn session_title(jsonl: &str) -> Option<String> {
+    let (mut custom, mut ai) = (None, None);
+    for line in jsonl.lines().filter(|l| l.contains("-title\"")) {
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        match v["type"].as_str() {
+            Some("custom-title") => custom = v["customTitle"].as_str().map(String::from),
+            Some("ai-title") => ai = v["aiTitle"].as_str().map(String::from),
+            _ => {}
+        }
+    }
+    let t: String = custom.or(ai)?.chars().filter(|c| !c.is_control() && !"\"&|<>^%!".contains(*c)).take(60).collect();
+    let t = t.trim().to_string();
+    (!t.is_empty()).then_some(t)
 }
 
 /// 다시 띄울 세션용 설정 파일: 아직 승인 안 한 프로젝트 MCP 서버(.mcp.json)를 꺼서 "새 MCP 서버 발견" 질문을 막음.
@@ -495,6 +517,17 @@ pub fn install_switch_command() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn session_title_prefers_custom() {
+        let ai = r#"{"type":"ai-title","aiTitle":"자동 제목"}"#;
+        let custom = r#"{"type":"custom-title","customTitle":"내 제목 & 100%"}"#;
+        assert_eq!(super::session_title(ai).as_deref(), Some("자동 제목"));
+        assert_eq!(super::session_title(&format!("{ai}
+{custom}
+{ai}")).as_deref(), Some("내 제목  100"));
+        assert_eq!(super::session_title(r#"{"type":"user"}"#), None);
+    }
+
     #[test]
     fn unapproved_mcp_skips_approved() {
         use serde_json::json;
