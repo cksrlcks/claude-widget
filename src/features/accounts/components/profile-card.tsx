@@ -1,3 +1,5 @@
+import { Trash2 } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AvatarPicker } from "@/features/accounts/components/avatar-picker"
@@ -14,6 +16,7 @@ type Props = {
   className?: string
 }
 
+/** 계정 카드: 아바타 · 이름 · 세션 사용량 · 전환/삭제 + 아래에 아바타 선택 */
 export function ProfileCard({ profile: p, active, className }: Props) {
   const confirm = useConfirm()
   const switchAccount = useSwitchAccount()
@@ -27,43 +30,60 @@ export function ProfileCard({ profile: p, active, className }: Props) {
     if (ok) remove.mutate(p.id)
   }
 
-  const lastUsed = p.lastUsage?.session ? ` · 마지막 세션 사용 ${Math.round(p.lastUsage.session.used)}%` : ""
+  const used = p.lastUsage?.session ? Math.round(p.lastUsage.session.used) : null
 
   return (
     <div
       className={cn(
-        "bg-card rounded-[14px] border p-4",
+        "bg-card rounded-[10px] border px-3.5 py-3",
         active && "border-primary ring-primary/15 ring-[3px]",
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-3.5">
-        <ProfileAvatar profile={p} className="size-[52px]" />
-        <div className="grid min-w-0 flex-1 gap-0.5">
-          <ProfileLabelInput profile={p} />
-          <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
-            <span className="truncate">{p.email}</span>
-            {active && <Badge className="bg-primary/15 font-normal text-[#9dbdf7]">사용 중</Badge>}
+      <div className="flex min-w-0 items-center gap-3">
+        <ProfileAvatar profile={p} className="size-9 shrink-0" />
+        <div className="grid min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <ProfileLabelInput profile={p} className="field-sizing-content w-auto max-w-full min-w-0 text-[12.5px]" />
+            {active && <Badge className="bg-primary/15 text-primary shrink-0 font-semibold">사용 중</Badge>}
           </div>
-          <div className="text-muted-foreground truncate text-xs">
-            {p.orgName}
+          <div className="text-muted-foreground truncate text-[11px]">
+            {p.email}
             {p.plan && ` · ${p.plan}`}
-            {lastUsed}
+          </div>
+          {p.refreshExpired && (
+            <div className="text-destructive mt-0.5 text-[11px]">로그인이 만료됐어요 · 다시 로그인해 주세요</div>
+          )}
+        </div>
+        <div className="w-[84px] shrink-0" title="마지막으로 확인한 세션 사용량">
+          <div className="text-muted-foreground flex justify-between text-[10.5px]">
+            <span>세션</span>
+            <span className="tabular-nums">{used === null ? "—" : `${used}%`}</span>
+          </div>
+          <div className="bg-foreground/8 mt-1 h-1 overflow-hidden rounded-full">
+            <i className="bg-primary block h-full rounded-full" style={{ width: `${used ?? 0}%` }} />
           </div>
         </div>
-        <div className="grid w-[76px] shrink-0 gap-1.5">
-          <Button disabled={active || switchAccount.isPending} onClick={() => switchAccount.mutate(p.id)}>
-            {active ? "사용 중" : "전환"}
-          </Button>
-          <Button variant="destructive" disabled={active || remove.isPending} onClick={onRemove}>
-            삭제
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant={active ? "secondary" : "default"}
+          disabled={active || switchAccount.isPending}
+          onClick={() => switchAccount.mutate(p.id)}
+        >
+          전환
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          title="삭제"
+          className="text-muted-foreground hover:text-destructive"
+          disabled={active || remove.isPending}
+          onClick={onRemove}
+        >
+          <Trash2 />
+        </Button>
       </div>
-      {p.refreshExpired && (
-        <p className="text-warning mt-2.5 text-xs">저장된 로그인이 만료됐습니다. 이 계정으로 다시 로그인해 주세요.</p>
-      )}
-      <AvatarPicker profile={p} className="mt-3.5 border-t pt-3.5" />
+      <AvatarPicker profile={p} className="mt-3 border-t pt-3" />
     </div>
   )
 }

@@ -25,12 +25,12 @@ export function InventoryGroup({ title, hint, items, className }: Props) {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className={cn("bg-card overflow-hidden rounded-xl border", className)}
+      className={cn("bg-card overflow-hidden rounded-[10px] border", className)}
     >
-      <CollapsibleTrigger className="flex h-[42px] w-full cursor-pointer items-center gap-2.5 px-3.5 text-left hover:bg-white/[0.025]">
+      <CollapsibleTrigger className="hover:bg-foreground/[0.03] flex h-[42px] w-full cursor-pointer items-center gap-2.5 px-3.5 text-left">
         <ChevronRight className={cn("text-muted-foreground size-3.5 transition-transform", open && "rotate-90")} />
         <span>{title}</span>
-        <span className="text-muted-foreground rounded-full bg-white/7 px-2 text-[11px] tabular-nums">
+        <span className="text-muted-foreground bg-foreground/7 rounded-full px-2 text-[11px] tabular-nums">
           {items.length}
         </span>
         <span className="text-muted-foreground ml-auto min-w-0 truncate text-[11px]">{hint}</span>

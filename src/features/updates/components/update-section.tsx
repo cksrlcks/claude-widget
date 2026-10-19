@@ -49,7 +49,7 @@ export function UpdateSection({ update: u, className }: Props) {
 
   return (
     <Section title="업데이트" className={className}>
-      <div className="bg-card grid gap-3 rounded-[14px] border p-4">
+      <div className="bg-card grid gap-3 rounded-[10px] border p-3.5">
         <div className="flex items-center gap-3">
           <div className="grid min-w-0 flex-1 gap-0.5">
             <div className="font-semibold">
@@ -74,7 +74,7 @@ export function UpdateSection({ update: u, className }: Props) {
           )}
         </div>
         {u.installing && (
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+          <div className="bg-foreground/8 h-1.5 overflow-hidden rounded-full">
             <i
               className="bg-primary block h-full rounded-full transition-all"
               style={{ width: `${u.progress ?? 0}%` }}

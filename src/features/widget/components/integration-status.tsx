@@ -36,8 +36,8 @@ export function IntegrationStatus({ integrations, className }: Props) {
       onClick={() => api.recheck()}
       title={checkedAt ? `마지막 확인 ${new Date(checkedAt).toLocaleTimeString()} · 클릭해서 다시 확인` : undefined}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2 rounded-[10px] bg-white/5 px-2.5 py-[7px] text-left text-xs hover:bg-white/9",
-        bad && "bg-destructive/14 hover:bg-destructive/20 text-[#ffd3da]",
+        "bg-foreground/5 hover:bg-foreground/9 flex w-full cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-[7px] text-left text-xs",
+        bad && "bg-destructive/14 hover:bg-destructive/20 text-destructive",
         className,
       )}
     >

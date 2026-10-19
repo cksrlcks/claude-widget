@@ -664,15 +664,14 @@ fn open_window(app: &AppHandle, label: &str, file: &str, title: &str, size: (f64
 }
 
 fn open_settings(app: &AppHandle) {
-    open_window(app, "settings", "settings.html", "Claude 위젯 설정", (560.0, 720.0));
+    open_window(app, "settings", "settings.html", "Claude 위젯 설정", (760.0, 560.0));
 }
 
+/// 스토어는 설정 창의 한 페이지. 새 창이면 #store로 열고, 이미 열려 있으면 이벤트로 페이지를 바꿈.
+/// 카탈로그는 스토어 페이지가 열릴 때 프런트에서 불러옴
 fn open_store(app: &AppHandle) {
-    open_window(app, "store", "store.html", "플러그인 스토어", (760.0, 760.0));
-    let empty = state(app).catalog.lock().unwrap()["items"].as_array().map(|a| a.is_empty()).unwrap_or(true);
-    if empty {
-        tauri::async_runtime::spawn(load_catalog(app.clone()));
-    }
+    let _ = app.emit_to("settings", "settings-page", "store");
+    open_window(app, "settings", "settings.html#store", "Claude 위젯 설정", (760.0, 560.0));
 }
 
 fn toggle_widget(app: &AppHandle) {

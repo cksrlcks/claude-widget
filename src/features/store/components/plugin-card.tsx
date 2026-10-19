@@ -23,22 +23,22 @@ export function PluginCard({ plugin: p, installing, onInstall, className }: Prop
   return (
     <div
       className={cn(
-        "bg-card hover:border-border-strong flex min-w-0 items-center gap-4 rounded-[14px] border px-4 py-3.5",
+        "bg-card hover:border-border-strong flex min-w-0 items-center gap-4 rounded-[10px] border px-3.5 py-3",
         p.installed && "border-success/35 hover:border-success/50",
         className,
       )}
     >
       <div className="grid min-w-0 flex-1 gap-1.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[13.5px] font-semibold">{p.name}</span>
+          <span className="truncate text-[12.5px] font-semibold">{p.name}</span>
           {p.version && <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">v{p.version}</span>}
-          <Badge variant="secondary" className={cn("font-normal", official && "bg-primary/15 text-[#9dbdf7]")}>
+          <Badge variant="secondary" className={cn("font-normal", official && "bg-primary/15 text-primary")}>
             {marketplaceLabel(p.marketplace)}
           </Badge>
           {p.installed && (
             <Badge
               variant="secondary"
-              className={cn("font-normal", p.enabled ? "bg-success/15 text-[#8fe0b2]" : "text-muted-foreground")}
+              className={cn("font-normal", p.enabled ? "bg-success/15 text-success" : "text-muted-foreground")}
             >
               {p.enabled ? "사용 중" : "꺼짐"}
             </Badge>
@@ -53,7 +53,7 @@ export function PluginCard({ plugin: p, installing, onInstall, className }: Prop
             </button>
           )}
         </div>
-        <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed" title={p.description}>
+        <p className="text-muted-foreground line-clamp-2 text-[11.5px] leading-relaxed" title={p.description}>
           {p.description || "설명 없음"}
         </p>
       </div>
@@ -68,7 +68,7 @@ function PluginActions({ plugin: p, installing, onInstall }: Omit<Props, "classN
 
   if (!p.installed) {
     return (
-      <Button className="w-[84px] shrink-0" disabled={installing} onClick={() => onInstall(p.id)}>
+      <Button size="sm" className="w-[76px] shrink-0" disabled={installing} onClick={() => onInstall(p.id)}>
         {installing ? "설치 중…" : "설치"}
       </Button>
     )
@@ -81,15 +81,16 @@ function PluginActions({ plugin: p, installing, onInstall }: Omit<Props, "classN
   }
 
   return (
-    <div className="grid w-[84px] shrink-0 gap-1.5">
+    <div className="grid w-[76px] shrink-0 gap-1">
       <Button
+        size="sm"
         variant="secondary"
         disabled={action.isPending}
         onClick={() => action.mutate({ action: p.enabled ? "disable" : "enable", id: p.id })}
       >
         {p.enabled ? "비활성화" : "활성화"}
       </Button>
-      <Button variant="destructive" disabled={action.isPending} onClick={uninstall}>
+      <Button size="sm" variant="destructive" disabled={action.isPending} onClick={uninstall}>
         제거
       </Button>
     </div>

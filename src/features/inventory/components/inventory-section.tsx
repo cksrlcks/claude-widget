@@ -23,7 +23,7 @@ export function InventorySection({ state, className }: Props) {
       title="설치된 스킬 · 플러그인"
       className={className}
       action={
-        <Button variant="secondary" onClick={() => api.openStore()}>
+        <Button variant="secondary" size="sm" onClick={() => api.openStore()}>
           <Store /> 플러그인 스토어 열기
         </Button>
       }

@@ -1,4 +1,4 @@
-import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { api } from "@/shared/api/commands"
 import { KindBadge } from "@/shared/components/kind-badge"
@@ -23,7 +23,7 @@ type Props = {
   className?: string
 }
 
-// 열 고정: 체크 | 이름 | 종류 | 상태 | 버튼 → 줄마다 세로 정렬이 맞도록
+// 열 고정: 토글 | 이름 | 종류 | 상태 | 버튼 → 줄마다 세로 정렬이 맞도록
 export function WatchRow({ item, current, checked, disabled, onCheckedChange, className }: Props) {
   const status: IntegrationStatus = current?.status ?? "missing"
   const kind = kindOf(item)
@@ -31,17 +31,18 @@ export function WatchRow({ item, current, checked, disabled, onCheckedChange, cl
   return (
     <label
       className={cn(
-        "grid min-h-9 cursor-pointer grid-cols-[16px_minmax(0,1fr)_68px_96px_64px] items-center gap-x-2.5 rounded-lg px-2.5 hover:bg-white/[0.035]",
-        !checked && "opacity-45",
+        "hover:bg-foreground/[0.03] grid min-h-10 cursor-pointer grid-cols-[30px_minmax(0,1fr)_68px_104px_64px] items-center gap-x-2.5 px-3.5",
         className,
       )}
     >
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onCheckedChange(v === true)} />
-      <span className="truncate" title={current?.statusText}>
+      <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+      <span className={cn("truncate", !checked && "opacity-45")} title={current?.statusText}>
         {displayName(item)}
       </span>
       <KindBadge kind={kind} className="justify-self-start" />
-      <span className={cn("text-[11.5px] whitespace-nowrap", STATUS_TONE[status])}>{STATUS_LABEL[status]}</span>
+      <span className={cn("text-[11.5px] whitespace-nowrap", STATUS_TONE[status], !checked && "opacity-45")}>
+        {STATUS_LABEL[status]}
+      </span>
       <RowAction status={status} name={item.name} isConnector={kind === "connector"} />
     </label>
   )
@@ -65,7 +66,7 @@ function RowAction({ status, name, isConnector }: RowActionProps) {
         action.run()
       }}
       title={status === "missing" ? "claude.ai 커넥터 설정에서 이 계정에 추가" : undefined}
-      className="bg-primary/15 hover:border-primary justify-self-end rounded-md border border-transparent px-2 py-0.5 text-[11px] whitespace-nowrap text-[#9dbdf7] hover:text-white"
+      className="bg-primary/15 hover:border-primary text-primary justify-self-end rounded-md border border-transparent px-2 py-0.5 text-[11px] whitespace-nowrap"
     >
       {action.label}
     </button>

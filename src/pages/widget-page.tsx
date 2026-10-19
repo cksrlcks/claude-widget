@@ -31,11 +31,12 @@ export function WidgetPage() {
         <MiniBubble
           profile={profile}
           integrations={s.integrations}
+          session={s.usage?.session ?? null}
           onExpand={() => api.setMini(false)}
           animated={s.avatarMotion}
         />
       ) : (
-        <div ref={cardRef} className="bg-widget rounded-2xl border border-white/10 px-3.5 py-3">
+        <div ref={cardRef} className="bg-widget border-foreground/10 rounded-2xl border px-3.5 py-3">
           <AccountHeader
             profile={profile}
             onMinimize={() => api.setMini(true)}
@@ -47,7 +48,7 @@ export function WidgetPage() {
             <button
               type="button"
               onClick={() => api.loginNew()}
-              className="bg-destructive/14 hover:bg-destructive/20 mb-2.5 w-full cursor-pointer rounded-[10px] px-2.5 py-[7px] text-left text-xs text-[#ffd3da]"
+              className="bg-destructive/14 hover:bg-destructive/20 text-destructive mb-2.5 w-full cursor-pointer rounded-[10px] px-2.5 py-[7px] text-left text-xs"
             >
               ⚠ {s.authProblem} · 클릭해서 다시 로그인
             </button>

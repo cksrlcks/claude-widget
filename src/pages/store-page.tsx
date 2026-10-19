@@ -20,6 +20,12 @@ export function StorePage() {
     if (catalog?.fetchedAt) setInstalling(new Set())
   }, [catalog?.fetchedAt])
 
+  // 처음 열 때 한 번 불러옴 (이후엔 백엔드가 "catalog" 이벤트로 갱신)
+  const needsLoad = !!catalog && !catalog.fetchedAt && !catalog.loading
+  useEffect(() => {
+    if (needsLoad) api.reloadCatalog()
+  }, [needsLoad])
+
   const install = (id: string) => {
     setInstalling((s) => new Set(s).add(id))
     api.installPlugin(id)
@@ -34,8 +40,8 @@ export function StorePage() {
         : ""
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <header className="grid gap-3.5 border-b px-6 pt-5 pb-3">
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="grid gap-3 border-b px-6 pt-5 pb-2.5">
         <StoreToolbar
           query={filter.query}
           onQueryChange={filter.setQuery}

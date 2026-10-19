@@ -23,7 +23,7 @@ export function StoreTabs({ tab, onTabChange, counts, status, className }: Props
           type="button"
           onClick={() => onTabChange(t.key)}
           className={cn(
-            "text-muted-foreground hover:text-foreground inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg px-3",
+            "text-muted-foreground hover:text-foreground inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12.5px]",
             tab === t.key && "bg-secondary text-foreground",
           )}
         >
@@ -31,7 +31,9 @@ export function StoreTabs({ tab, onTabChange, counts, status, className }: Props
           {counts[t.key] > 0 && <span className="text-[11px] tabular-nums opacity-80">{counts[t.key]}</span>}
         </button>
       ))}
-      <span className="text-muted-foreground ml-auto text-xs">{status}</span>
+      <span className="text-muted-foreground ml-auto min-w-0 truncate pl-2 text-[11px]" title={status}>
+        {status}
+      </span>
     </div>
   )
 }

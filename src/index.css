@@ -29,6 +29,62 @@
   --border-strong: #41454e;
   --success: #4fd18b;
   --warning: #f2b84b;
+  --sidebar: #101113;
+}
+
+/* 다크 테마: Claude 다크 톤(따뜻한 차콜 + 테라코타). shared/lib/theme.ts가 <html>에 붙임 */
+.theme-ember {
+  --background: #262624;
+  --foreground: #f0eee6;
+  --card: #30302e;
+  --card-foreground: #f0eee6;
+  --popover: #30302e;
+  --popover-foreground: #f0eee6;
+  --primary: #d97757;
+  --primary-foreground: #1f1e1d;
+  --secondary: #3a3a37;
+  --secondary-foreground: #f0eee6;
+  --muted: #30302e;
+  --muted-foreground: #a19f97;
+  --accent: #3a3a37;
+  --accent-foreground: #f0eee6;
+  --destructive: #e8604a;
+  --border: #3a3a37;
+  --input: #3a3a37;
+  --ring: #d97757;
+  --border-strong: #4a4a46;
+  --success: #7fbf8c;
+  --warning: #e0b061;
+  --sidebar: #1f1e1d;
+  --widget: #262624;
+}
+
+/* 라이트 테마: 크림 배경 + 테라코타 */
+.theme-paper {
+  --background: #faf9f5;
+  --foreground: #1f1e1d;
+  --card: #ffffff;
+  --card-foreground: #1f1e1d;
+  --popover: #ffffff;
+  --popover-foreground: #1f1e1d;
+  --primary: #c96442;
+  --primary-foreground: #ffffff;
+  --secondary: #efece4;
+  --secondary-foreground: #1f1e1d;
+  --muted: #efece4;
+  --muted-foreground: #7c7a72;
+  --accent: #efece4;
+  --accent-foreground: #1f1e1d;
+  --destructive: #c9442f;
+  --border: #e6e2d8;
+  --input: #dcd8cd;
+  --ring: #c96442;
+  --border-strong: #cfcabd;
+  --success: #3f8a52;
+  --warning: #b7791f;
+  --sidebar: #f3f0e8;
+  --widget: #faf9f5;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -55,6 +111,7 @@
   --color-border-strong: var(--border-strong);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-sidebar: var(--sidebar);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

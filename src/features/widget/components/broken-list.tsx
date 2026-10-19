@@ -39,7 +39,7 @@ function BrokenRow({ item }: { item: Integration }) {
   return (
     <Row onClick={action?.run} title={item.statusText}>
       ✕{" "}
-      <span className="text-muted-foreground mx-0.5 rounded bg-white/9 px-1 text-[10px]">
+      <span className="text-muted-foreground bg-foreground/9 mx-0.5 rounded px-1 text-[10px]">
         {KIND_SHORT[kindOf(item)]}
       </span>{" "}
       {displayName(item)} — {action?.label ?? "연결 실패"}
@@ -60,8 +60,8 @@ function Row({ onClick, title, className, children }: RowProps) {
       onClick={onClick}
       title={title}
       className={cn(
-        "truncate rounded-md px-2.5 py-1 text-[11px] text-[#f7b4bf]",
-        onClick && "cursor-pointer hover:bg-white/9 hover:text-white",
+        "text-destructive truncate rounded-md px-2.5 py-1 text-[11px]",
+        onClick && "hover:bg-foreground/9 cursor-pointer",
         className,
       )}
     >

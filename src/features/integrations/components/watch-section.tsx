@@ -1,10 +1,11 @@
 import { RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { WatchRow } from "@/features/integrations/components/watch-row"
 import { api } from "@/shared/api/commands"
 import { Section } from "@/shared/components/section"
+import { SettingGroup, SettingRow } from "@/shared/components/setting-row"
 import type { AppState } from "@/shared/types"
 
 type Props = {
@@ -31,23 +32,21 @@ export function WatchSection({ state, className }: Props) {
 
   return (
     <Section
-      title="감시할 MCP · 플러그인"
-      description={`${info} · 체크한 항목만 위젯에 표시됩니다`}
+      title="MCP 감시"
+      description={`켠 항목만 위젯의 끊김 개수에 들어갑니다 · ${info}`}
       className={className}
       action={
-        <Button variant="secondary" disabled={checking} onClick={() => api.recheck()}>
+        <Button variant="secondary" size="sm" disabled={checking} onClick={() => api.recheck()}>
           <RefreshCw className={checking ? "animate-spin" : undefined} /> 지금 확인
         </Button>
       }
     >
-      <label className="inline-flex w-fit cursor-pointer items-center gap-2">
-        <Checkbox
-          checked={watchAll}
-          onCheckedChange={(v) => api.setWatch(v === true ? null : known.map((k) => k.key))}
-        />
-        전체 감시 (새로 추가되는 항목 포함)
-      </label>
-      <div className="bg-card grid max-h-[300px] gap-0.5 overflow-x-hidden overflow-y-auto rounded-[14px] border p-1.5">
+      <SettingGroup>
+        <SettingRow title="전체 감시" description="새로 추가되는 항목도 자동으로 포함">
+          <Switch checked={watchAll} onCheckedChange={(on) => api.setWatch(on ? null : known.map((k) => k.key))} />
+        </SettingRow>
+      </SettingGroup>
+      <div className="bg-card divide-y overflow-x-hidden rounded-[10px] border">
         {known.length ? (
           known.map((k) => (
             <WatchRow

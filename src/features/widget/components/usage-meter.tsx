@@ -23,7 +23,7 @@ export function UsageMeter({ label, window: w, source, fallback, className }: Pr
         <span>{label}</span>
         <b className="text-foreground text-[13px] font-semibold tabular-nums">{used === null ? "-" : `${used}%`}</b>
       </div>
-      <div className="mt-[5px] h-1.5 overflow-hidden rounded-full bg-white/8">
+      <div className="bg-foreground/8 mt-[5px] h-1.5 overflow-hidden rounded-full">
         <i
           className={cn("block h-full rounded-full transition-all duration-400", BAR_TONE[usageTone(used ?? 0)])}
           style={{ width: `${used ?? 0}%` }}
