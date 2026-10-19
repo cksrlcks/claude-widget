@@ -46,14 +46,6 @@ export function GeneralSection({ state, className }: Props) {
         />
         분
       </label>
-      <label className="flex w-fit cursor-pointer items-center gap-2.5">
-        <Checkbox checked={state.autoStart} onCheckedChange={(v) => api.setAutoStart(v === true)} />
-        Windows 시작 시 자동 실행
-      </label>
-      <label className="flex w-fit cursor-pointer items-center gap-2.5">
-        <Checkbox checked={state.avatarMotion} onCheckedChange={(v) => api.setAvatarMotion(v === true)} />
-        아바타 움직임
-      </label>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1">위젯 위치</span>
         {ANCHORS.map((a) => (
@@ -68,6 +60,14 @@ export function GeneralSection({ state, className }: Props) {
           </Button>
         ))}
       </div>
+      <label className="flex w-fit cursor-pointer items-center gap-2.5">
+        <Checkbox checked={state.autoStart} onCheckedChange={(v) => api.setAutoStart(v === true)} />
+        Windows 시작 시 자동 실행
+      </label>
+      <label className="flex w-fit cursor-pointer items-center gap-2.5">
+        <Checkbox checked={state.avatarMotion} onCheckedChange={(v) => api.setAvatarMotion(v === true)} />
+        아바타 움직임
+      </label>
     </Section>
   )
 }

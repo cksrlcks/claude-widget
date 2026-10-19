@@ -518,8 +518,13 @@ fn widget_target(app: &AppHandle, w: &WebviewWindow) -> Option<(PhysicalSize<u32
 fn place_widget(app: &AppHandle) {
     let Some(w) = widget(app) else { return };
     let Some((size, pos)) = widget_target(app, &w) else { return };
-    let _ = w.set_size(size);
-    let _ = w.set_position(pos);
+    // 크기·위치를 따로 바꾸면 그 사이 한 프레임 동안 엉뚱한 곳에 그려져 튐 → SetWindowPos로 한 번에 적용
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+    let (Ok(hwnd), Ok(o), Ok(i)) = (w.hwnd(), w.outer_size(), w.inner_size()) else { return };
+    // SetWindowPos는 보이지 않는 테두리를 포함한 바깥 크기 기준
+    let cw = size.width as i32 + o.width as i32 - i.width as i32;
+    let ch = size.height as i32 + o.height as i32 - i.height as i32;
+    unsafe { SetWindowPos(hwnd.0 as _, std::ptr::null_mut(), pos.x, pos.y, cw, ch, SWP_NOZORDER | SWP_NOACTIVATE) };
 }
 
 /// Windows가 창 좌우에 두는 보이지 않는 테두리 폭(px). set_position은 이 테두리 바깥 기준이라 보정에 필요
@@ -906,15 +911,16 @@ fn set_mini(app: AppHandle, value: bool) {
 
 #[tauri::command]
 fn set_height(app: AppHandle, h: f64) {
-    let mini = {
+    {
         let st = state(&app);
         let mut rt = st.rt.lock().unwrap();
+        // 접는 순간 60px 창에서 카드가 다시 그려지며 엉뚱한 높이가 들어옴 → 펼칠 때 그 높이로 떴다가 튀므로 무시
+        if rt.mini {
+            return;
+        }
         rt.full_height = h.round().clamp(120.0, 420.0);
-        rt.mini
-    };
-    if !mini {
-        place_widget(&app);
     }
+    place_widget(&app);
 }
 
 #[tauri::command]
