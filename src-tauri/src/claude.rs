@@ -445,16 +445,23 @@ pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::proce
 
 /// 대화 기록(jsonl)의 제목: 마지막 custom-title(직접 지정), 없으면 마지막 ai-title. cmd /c로 넘기므로 셸 특수문자 제거
 fn session_title(jsonl: &str) -> Option<String> {
-    let (mut custom, mut ai) = (None, None);
-    for line in jsonl.lines().filter(|l| l.contains("-title\"")) {
+    let (mut custom, mut ai, mut first) = (None, None, None);
+    for line in jsonl.lines().filter(|l| l.contains("-title\"") || l.contains("\"type\":\"user\"")) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         match v["type"].as_str() {
             Some("custom-title") => custom = v["customTitle"].as_str().map(String::from),
             Some("ai-title") => ai = v["aiTitle"].as_str().map(String::from),
+            // 짧은 대화는 제목이 아직 없음 → 첫 질문 내용 (도구 결과·명령 래퍼(<command-...>)·메타 메시지는 제외)
+            Some("user") if first.is_none() && v["isMeta"] != Value::Bool(true) => {
+                first = v["message"]["content"].as_str().filter(|t| !t.trim_start().starts_with('<')).map(|t| {
+                    let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+                    if t.chars().count() > 40 { format!("{}…", t.chars().take(40).collect::<String>()) } else { t }
+                });
+            }
             _ => {}
         }
     }
-    let t: String = custom.or(ai)?.chars().filter(|c| !c.is_control() && !"\"&|<>^%!".contains(*c)).take(60).collect();
+    let t: String = custom.or(ai).or(first)?.chars().filter(|c| !c.is_control() && !"\"&|<>^%!".contains(*c)).take(60).collect();
     let t = t.trim().to_string();
     (!t.is_empty()).then_some(t)
 }
@@ -526,6 +533,12 @@ mod tests {
 {custom}
 {ai}")).as_deref(), Some("내 제목  100"));
         assert_eq!(super::session_title(r#"{"type":"user"}"#), None);
+        // 제목이 없으면 첫 질문 (명령 래퍼·도구 결과는 건너뜀), 제목이 생기면 제목 우선
+        let cmd = r#"{"type":"user","message":{"content":"<command-name>/remote-control</command-name>"}}"#;
+        let tool = r#"{"type":"user","message":{"content":[{"type":"tool_result"}]}}"#;
+        let hi = r#"{"type":"user","message":{"content":"안녕\n반가워"}}"#;
+        assert_eq!(super::session_title(&[cmd, tool, hi].join("\n")).as_deref(), Some("안녕 반가워"));
+        assert_eq!(super::session_title(&[hi, ai].join("\n")).as_deref(), Some("자동 제목"));
     }
 
     #[test]
