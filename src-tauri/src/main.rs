@@ -595,6 +595,8 @@ fn create_widget(app: &AppHandle) -> tauri::Result<()> {
         .resizable(false)
         .always_on_top(true)
         .skip_taskbar(true)
+        // macOS: 데스크톱(Spaces)을 옮기거나 전체 화면 앱 위에서도 위젯이 따라옴 (Windows는 지금 동작 유지)
+        .visible_on_all_workspaces(cfg!(target_os = "macos"))
         .focused(false)
         .visible(false)
         .build()?;
@@ -658,7 +660,17 @@ fn center_on_widget_monitor(app: &AppHandle, w: &WebviewWindow) {
     let _ = w.set_position(PhysicalPosition::new(x, y.max(area.position.y)));
 }
 
+/// macOS: 평소엔 메뉴 막대 앱처럼 Dock·Cmd+Tab에서 숨기고, 설정 창이 열려 있는 동안만 보임 (Windows 작업 표시줄과 같게)
+#[cfg(target_os = "macos")]
+fn show_in_dock(app: &AppHandle, show: bool) {
+    let policy = if show { tauri::ActivationPolicy::Regular } else { tauri::ActivationPolicy::Accessory };
+    let _ = app.set_activation_policy(policy);
+}
+#[cfg(not(target_os = "macos"))]
+fn show_in_dock(_: &AppHandle, _: bool) {}
+
 fn open_window(app: &AppHandle, label: &str, file: &str, title: &str, size: (f64, f64)) {
+    show_in_dock(app, true);
     if let Some(w) = app.get_webview_window(label) {
         center_on_widget_monitor(app, &w);
         return bring_to_front(&w);
@@ -671,6 +683,12 @@ fn open_window(app: &AppHandle, label: &str, file: &str, title: &str, size: (f64
         .visible(false)
         .build()
     {
+        let handle = app.clone();
+        w.on_window_event(move |e| {
+            if let WindowEvent::Destroyed = e {
+                show_in_dock(&handle, false);
+            }
+        });
         center_on_widget_monitor(app, &w);
         bring_to_front(&w);
     }
@@ -1153,6 +1171,7 @@ fn main() {
         .on_menu_event(|app, e| handle_menu(app, e.id().as_ref()))
         .setup(|app| {
             let handle = app.handle().clone();
+            show_in_dock(&handle, false);
             create_widget(&handle)?;
             claude::install_switch_command();
             // exe 경로가 바뀌었을 수 있어(업데이트·개발 모드) 시작할 때마다 다시 맞춤
