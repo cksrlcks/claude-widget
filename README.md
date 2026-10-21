@@ -1,6 +1,6 @@
 # Claude Widget
 
-Windows 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보고, 계정을 바꾸고, MCP 끊김을 바로 알 수 있습니다.
+Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보고, 계정을 바꾸고, MCP 끊김을 바로 알 수 있습니다.
 
 > 비공식 개인 프로젝트입니다. Anthropic과 관련이 없습니다.
 
@@ -19,8 +19,14 @@ Windows 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보고, 계
 
 ## 설치
 
-[Releases](https://github.com/cksrlcks/claude-widget/releases/latest)에서 `Claude-Widget-Setup-<버전>.exe`를 받아 실행합니다.
+[Releases](https://github.com/cksrlcks/claude-widget/releases/latest)에서 받습니다.
 [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI(`claude`)가 설치되어 있고 PATH에 있어야 합니다.
+
+- **Windows**: `…_x64-setup.exe`를 받아 실행
+- **macOS** (11 이상, Apple Silicon·Intel 공용): `…_universal.dmg`를 열어 `Claude Widget`을 응용 프로그램 폴더로 옮김
+  - Apple 서명을 하지 않은 앱이라 처음 열면 "확인되지 않은 개발자" 경고가 뜹니다.
+    **시스템 설정 → 개인정보 보호 및 보안**에서 "그래도 열기"를 한 번 누르면 이후에는 그냥 열립니다 (자동 업데이트도 그대로 동작)
+  - 처음 계정을 읽을 때 키체인 접근을 물으면 "항상 허용"을 누릅니다
 
 ## 사용법
 
@@ -76,16 +82,20 @@ Windows 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보고, 계
 
 ## 데이터와 주의
 
+데이터 폴더: Windows `%APPDATA%/claude-widget`, macOS `~/Library/Application Support/claude-widget`
+
 - `%APPDATA%/claude-widget/store.json` — 프로필 메타, 감시 목록, 위치, 설정
 - `%APPDATA%/claude-widget/secrets/*.dpapi` — 계정 토큰 (Windows DPAPI 암호화, 그 PC의 같은 사용자만 열 수 있음). 이전 Electron 버전의 `*.bin`은 첫 실행 때 자동으로 옮겨집니다
+- macOS: `secrets/*.enc` — 계정 토큰 (AES-256-GCM, 키는 로그인 키체인의 `Claude Widget` 항목)
+- macOS의 Claude Code는 `.credentials.json` 대신 키체인 `Claude Code-credentials` 항목에 토큰을 저장하므로, 전환 시 그 항목을 바꿉니다 (백업은 `~/.claude.json`만, 토큰을 평문 파일로 꺼내지 않음)
 - 전환 시 바뀌는 것: `~/.claude/.credentials.json`의 `claudeAiOauth`·`organizationUuid`, `~/.claude.json`의 `oauthAccount`. 그 외(MCP 설정, mcpOAuth, projects, settings.json 등)는 건드리지 않습니다. 전환 직전 두 파일은 `%APPDATA%/claude-widget/backups`에 백업됩니다.
 - 로그인 정보 파일을 직접 수정합니다. 자동 백업은 하지만 사용은 본인 책임입니다.
 - 사용량은 Claude Code가 내부적으로 쓰는 비공개 API(`/api/oauth/usage`)로 가져옵니다. 예고 없이 바뀌거나 막힐 수 있습니다.
 
 ## 개발
 
-[Tauri](https://tauri.app) 2 + Vite + React로 만들어져 Windows 내장 WebView2를 씁니다 (설치 파일 약 2MB).
-개발에는 Rust(rustup)와 Visual Studio Build Tools(C++)가 필요합니다.
+[Tauri](https://tauri.app) 2 + Vite + React로 만들어져 OS 내장 웹뷰(Windows WebView2, macOS WKWebView)를 씁니다.
+개발에는 Rust(rustup)와 Windows는 Visual Studio Build Tools(C++), macOS는 Xcode Command Line Tools가 필요합니다.
 
 ```bash
 npm install
@@ -93,7 +103,7 @@ npm run dev
 ```
 
 설치된 위젯이 켜져 있으면 개발 버전이 뜨지 않으니(단일 실행) 트레이에서 먼저 종료합니다.
-아이콘은 `npm run icons`로 다시 생성합니다 ([scripts/make-icons.js](scripts/make-icons.js)).
+아이콘은 `npm run icons`로 다시 생성합니다 ([scripts/make-icons.cjs](scripts/make-icons.cjs), macOS용 `icon.icns` 포함).
 
 ### 구조
 
@@ -119,7 +129,8 @@ src-tauri/src/              # 백엔드 (Rust)
 ├── main.rs                 # 창·트레이·메뉴, 프런트에서 부르는 명령, 원격 전환
 ├── claude.rs               # ~/.claude 읽기/쓰기, claude CLI 호출, 사용량 API, /switch·훅 설치
 ├── store.rs                # store.json, 토큰 저장
-├── crypto.rs               # DPAPI 암호화, Electron 토큰 이전
+├── crypto.rs               # 토큰 암호화 (Windows DPAPI·Electron 토큰 이전 / macOS AES + 키체인 키)
+├── keychain.rs             # macOS 키체인 읽기/쓰기 (/usr/bin/security)
 └── updates.rs              # 자동 업데이트
 ```
 
@@ -128,20 +139,25 @@ src-tauri/src/              # 백엔드 (Rust)
 ### 배포 (자동 업데이트)
 
 v1.2.0부터 앱이 GitHub Release의 `latest.json`을 보고 스스로 업데이트합니다. 업데이트 파일은 서명 키로 서명해야 합니다.
+빌드는 GitHub Actions([release.yml](.github/workflows/release.yml))가 Windows·macOS(Universal)에서 함께 합니다.
 
-1. `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`의 버전을 올린다
-2. 서명 빌드 — 개인 키(`%USERPROFILE%\.tauri\claude-widget.key`) 비밀번호를 물어봄
-
-   ```bash
-   powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
-   ```
-
-3. 배포 파일 준비 → `release/<버전>/`에 설치 파일과 `latest.json` 생성
+1. 버전 올리기 (`package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`)
 
    ```bash
-   node scripts/make-latest-json.cjs "릴리스 노트"
+   node scripts/bump-version.cjs 1.6.0
    ```
 
-4. 두 파일을 GitHub Release `v<버전>`에 올린다 (Latest로 지정)
+2. 커밋 후 태그를 push
+
+   ```bash
+   git tag v1.6.0
+   git push origin main v1.6.0
+   ```
+
+3. Actions가 끝나면 Release 초안에 설치 파일(Windows `.exe`, macOS `.dmg`)·업데이트 파일·`latest.json`이 올라와 있음 → 노트를 적고 **Publish** (Publish해야 기존 사용자에게 업데이트가 감)
+
+처음 한 번, 저장소 Settings → Secrets and variables → Actions에 서명 키를 등록해야 합니다.
+`TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용), `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`(비밀번호).
+Actions를 쓸 수 없을 때는 Windows에서 예전 방식(`scripts/build-release.ps1` → `scripts/make-latest-json.cjs`)으로 Windows만 배포할 수 있습니다.
 
 개인 키를 잃어버리면 이미 설치된 앱에 더 이상 업데이트를 보낼 수 없으니 따로 백업해 둔다.
