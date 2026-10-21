@@ -96,7 +96,7 @@ export function GeneralSection({ state, className }: Props) {
         <SettingRow title="아바타 움직임" description="도트 캐릭터가 가끔 움직입니다">
           <Switch checked={state.avatarMotion} onCheckedChange={api.setAvatarMotion} />
         </SettingRow>
-        <SettingRow title="Windows 시작 시 실행">
+        <SettingRow title="로그인 시 실행">
           <Switch checked={state.autoStart} onCheckedChange={api.setAutoStart} />
         </SettingRow>
       </SettingGroup>

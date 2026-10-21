@@ -1,6 +1,7 @@
-// 위젯 데이터 저장소 (%APPDATA%/claude-widget) — Electron 버전과 같은 파일·형식을 그대로 사용
+// 위젯 데이터 저장소 — Electron 버전과 같은 파일·형식을 그대로 사용
+// (Windows: %APPDATA%/claude-widget, macOS: ~/Library/Application Support/claude-widget)
 // - store.json: 프로필 메타, 감시 목록, 위젯 위치
-// - secrets/<accountUuid>.dpapi: 계정 토큰 (DPAPI 암호화)
+// - secrets/<accountUuid>.dpapi(macOS는 .enc): 계정 토큰 (crypto.rs로 암호화)
 use crate::crypto;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -83,8 +84,14 @@ impl Default for Store {
     }
 }
 
+#[cfg(windows)]
 pub fn data_dir() -> PathBuf {
     PathBuf::from(std::env::var("APPDATA").unwrap_or_default()).join("claude-widget")
+}
+
+#[cfg(not(windows))]
+pub fn data_dir() -> PathBuf {
+    crate::claude::home().join("Library").join("Application Support").join("claude-widget")
 }
 
 pub fn backup_dir() -> PathBuf {
@@ -114,23 +121,24 @@ fn secret_path(id: &str, ext: &str) -> PathBuf {
 }
 
 pub fn save_secret(id: &str, data: &Value) -> Result<(), String> {
-    let path = secret_path(id, "dpapi");
+    let path = secret_path(id, crypto::SECRET_EXT);
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
     let enc = crypto::protect(data.to_string().as_bytes())?;
     fs::write(path, enc).map_err(|e| e.to_string())
 }
 
 pub fn load_secret(id: &str) -> Option<Value> {
-    let enc = fs::read(secret_path(id, "dpapi")).ok()?;
+    let enc = fs::read(secret_path(id, crypto::SECRET_EXT)).ok()?;
     serde_json::from_slice(&crypto::unprotect(&enc).ok()?).ok()
 }
 
 pub fn delete_secret(id: &str) {
-    let _ = fs::remove_file(secret_path(id, "dpapi"));
+    let _ = fs::remove_file(secret_path(id, crypto::SECRET_EXT));
     let _ = fs::remove_file(secret_path(id, "bin"));
 }
 
 /// Electron 버전이 남긴 secrets/*.bin을 DPAPI(.dpapi)로 복사 (.bin은 Electron 버전으로 돌아갈 때를 위해 남김)
+#[cfg(windows)]
 pub fn migrate_electron_secrets() {
     let dir = data_dir().join("secrets");
     let local_state = data_dir().join("Local State");

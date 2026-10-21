@@ -1,13 +1,25 @@
-// 계정 토큰 암호화 (Windows DPAPI: 현재 Windows 사용자만 복호화 가능)
-// + Electron safeStorage("v10" + AES-256-GCM, 키는 Local State에 DPAPI로 보관)로 저장된 기존 토큰 복호화
-use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
-use base64::Engine;
-use std::{path::Path, ptr};
-use windows_sys::Win32::Foundation::LocalFree;
-use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CryptUnprotectData, CRYPT_INTEGER_BLOB};
+// 계정 토큰 암호화
+// - Windows: DPAPI (현재 Windows 사용자만 복호화 가능)
+//   + Electron safeStorage("v10" + AES-256-GCM, 키는 Local State에 DPAPI로 보관)로 저장된 기존 토큰 복호화
+// - macOS: AES-256-GCM, 키는 로그인 키체인에 보관
+#[cfg(windows)]
+pub use win::*;
+#[cfg(not(windows))]
+pub use mac::*;
 
-fn blob(data: &[u8]) -> CRYPT_INTEGER_BLOB {
-    CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 }
+#[cfg(windows)]
+mod win {
+    use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
+    use base64::Engine;
+    use std::{path::Path, ptr};
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CryptUnprotectData, CRYPT_INTEGER_BLOB};
+
+    /// 암호화된 토큰 파일 확장자
+    pub const SECRET_EXT: &str = "dpapi";
+
+    fn blob(data: &[u8]) -> CRYPT_INTEGER_BLOB {
+        CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 }
 }
 
 fn take(out: CRYPT_INTEGER_BLOB) -> Vec<u8> {
@@ -53,4 +65,59 @@ pub fn decrypt_electron(local_state: &Path, data: &[u8]) -> Result<Vec<u8>, Stri
     let (nonce, ct) = body.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
     cipher.decrypt(Nonce::from_slice(nonce), ct).map_err(|_| "AES-GCM 복호화 실패".to_string())
+}
+}
+
+#[cfg(not(windows))]
+mod mac {
+    use crate::keychain;
+    use aes_gcm::{
+        aead::{Aead, AeadCore, OsRng},
+        Aes256Gcm, Key, KeyInit, Nonce,
+    };
+    use base64::Engine;
+    use std::sync::OnceLock;
+
+    pub const SECRET_EXT: &str = "enc";
+
+    const KEY_SERVICE: &str = "Claude Widget";
+    const KEY_ACCOUNT: &str = "secret-key";
+    const NONCE_LEN: usize = 12;
+
+    // 키체인에서 한 번만 읽음. 없으면 새로 만들어 저장
+    fn cipher() -> Result<&'static Aes256Gcm, String> {
+        static CIPHER: OnceLock<Aes256Gcm> = OnceLock::new();
+        if let Some(c) = CIPHER.get() {
+            return Ok(c);
+        }
+        let b64 = base64::engine::general_purpose::STANDARD;
+        let key = match keychain::read(KEY_SERVICE)? {
+            Some(s) => b64.decode(s.trim()).map_err(|e| e.to_string())?,
+            None => {
+                let key = Aes256Gcm::generate_key(OsRng);
+                // update=false: 읽기만 실패한 경우 기존 키를 덮어써 토큰을 못 읽게 되는 일이 없게
+                keychain::write(KEY_SERVICE, KEY_ACCOUNT, &b64.encode(key), false)?;
+                key.to_vec()
+            }
+        };
+        if key.len() != 32 {
+            return Err("키 길이 오류".into());
+        }
+        Ok(CIPHER.get_or_init(|| Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key))))
+}
+
+/// nonce(12) + 암호문
+pub fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let ct = cipher()?.encrypt(&nonce, data).map_err(|_| "암호화 실패".to_string())?;
+    Ok([nonce.as_slice(), &ct].concat())
+}
+
+pub fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
+    if data.len() < NONCE_LEN {
+        return Err("데이터가 너무 짧음".into());
+    }
+    let (nonce, ct) = data.split_at(NONCE_LEN);
+    cipher()?.decrypt(Nonce::from_slice(nonce), ct).map_err(|_| "복호화 실패".to_string())
+}
 }

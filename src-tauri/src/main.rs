@@ -2,6 +2,8 @@
 
 mod claude;
 mod crypto;
+#[cfg(target_os = "macos")]
+mod keychain;
 mod store;
 mod updates;
 
@@ -447,7 +449,7 @@ async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path
 
     // shortcut: 프로세스가 30초 안에 죽은 경우만 롤백, Remote Control 등록 실패(프로세스는 살아 있음)는 감지 못 함
     tokio::time::sleep(Duration::from_secs(30)).await;
-    if child.try_wait().ok().flatten().is_none() {
+    if child.running() {
         remote_log(&format!("전환됨: {} / 세션 {session}{}", meta.email, if req.fork { " (복사본)" } else { "" }));
         return Ok(());
     }
@@ -553,13 +555,24 @@ fn widget_target(app: &AppHandle, w: &WebviewWindow) -> Option<(PhysicalSize<u32
 fn place_widget(app: &AppHandle) {
     let Some(w) = widget(app) else { return };
     let Some((size, pos)) = widget_target(app, &w) else { return };
-    // 크기·위치를 따로 바꾸면 그 사이 한 프레임 동안 엉뚱한 곳에 그려져 튐 → SetWindowPos로 한 번에 적용
+    set_frame(&w, size, pos);
+}
+
+// 크기·위치를 따로 바꾸면 그 사이 한 프레임 동안 엉뚱한 곳에 그려져 튐 → SetWindowPos로 한 번에 적용
+#[cfg(windows)]
+fn set_frame(w: &WebviewWindow, size: PhysicalSize<u32>, pos: PhysicalPosition<i32>) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
     let (Ok(hwnd), Ok(o), Ok(i)) = (w.hwnd(), w.outer_size(), w.inner_size()) else { return };
     // SetWindowPos는 보이지 않는 테두리를 포함한 바깥 크기 기준
     let cw = size.width as i32 + o.width as i32 - i.width as i32;
     let ch = size.height as i32 + o.height as i32 - i.height as i32;
     unsafe { SetWindowPos(hwnd.0 as _, std::ptr::null_mut(), pos.x, pos.y, cw, ch, SWP_NOZORDER | SWP_NOACTIVATE) };
+}
+
+#[cfg(not(windows))]
+fn set_frame(w: &WebviewWindow, size: PhysicalSize<u32>, pos: PhysicalPosition<i32>) {
+    let _ = w.set_size(size);
+    let _ = w.set_position(pos);
 }
 
 /// Windows가 창 좌우에 두는 보이지 않는 테두리 폭(px). set_position은 이 테두리 바깥 기준이라 보정에 필요
@@ -825,7 +838,10 @@ fn mcp_login(app: AppHandle, names: Vec<String>) {
     if safe.is_empty() {
         return;
     }
+    #[cfg(windows)]
     let steps = safe.iter().map(|n| format!("echo. & echo === {n} === & claude mcp login \"{n}\"")).collect::<Vec<_>>().join(" & ");
+    #[cfg(not(windows))]
+    let steps = safe.iter().map(|n| format!("echo; echo '=== {n} ==='; claude mcp login '{n}'")).collect::<Vec<_>>().join("\n");
     std::thread::spawn(move || {
         claude::run_in_terminal("MCP Login", &steps);
         spawn_check(&app);
@@ -982,6 +998,19 @@ async fn install_update_cmd(app: AppHandle) {
 }
 
 #[tauri::command]
+async fn claude_version_cmd() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(claude::claude_version).await.map_err(|e| e.to_string())?
+}
+
+/// 터미널 창에서 업데이트하고, 창이 닫히면 끝남 (화면은 그 뒤 버전을 다시 읽음)
+#[tauri::command]
+async fn update_claude_cmd() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| claude::run_in_terminal("Claude Code Update", claude::claude_update_command()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn account_menu(app: AppHandle) {
     let s = build_state(&app);
     if let (Some(w), Ok(menu)) = (widget(&app), build_menu(&app, &s, false)) {
@@ -1050,7 +1079,13 @@ fn main() {
         let _ = cmd.spawn();
         return;
     }
+    #[cfg(windows)]
     store::migrate_electron_secrets();
+    // switch CLI(--caller)는 실행 중인 위젯에 넘기고 바로 끝나므로 PATH 보정 불필요
+    #[cfg(not(windows))]
+    if parse_switch(&args).is_none() {
+        claude::fix_path_env();
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -1112,6 +1147,8 @@ fn main() {
             store_marketplace,
             check_update_cmd,
             install_update_cmd,
+            claude_version_cmd,
+            update_claude_cmd,
         ])
         .on_menu_event(|app, e| handle_menu(app, e.id().as_ref()))
         .setup(|app| {
