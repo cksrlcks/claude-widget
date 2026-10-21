@@ -1,8 +1,9 @@
 // 사용자 액션 → 백엔드 명령. 결과 상태는 "state" 이벤트로 돌아오므로 여기서는 토스트만 처리
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { api } from "@/shared/api/commands"
+import { appKeys } from "@/shared/api/queries"
 import type { MarketplaceAction, PluginAction, ProfilePatch } from "@/shared/types"
 
 const errorMessage = (err: unknown, fallback: string) =>
@@ -55,5 +56,15 @@ export function useMarketplaceAction() {
     onSuccess: (_, { action }) =>
       toast.success(action === "add" ? "마켓플레이스를 추가했습니다" : "마켓플레이스를 제거했습니다"),
     onError: (err) => toast.error(errorMessage(err, "작업에 실패했습니다")),
+  })
+}
+
+/** 터미널 창이 닫히면 끝남 → 바뀐 버전을 다시 읽음 */
+export function useUpdateClaude() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.updateClaude,
+    onSettled: () => qc.invalidateQueries({ queryKey: appKeys.claudeVersion() }),
+    onError: (err) => toast.error(errorMessage(err, "Claude Code 업데이트를 실행하지 못했습니다")),
   })
 }

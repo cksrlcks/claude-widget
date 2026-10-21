@@ -10,6 +10,7 @@ export const appKeys = {
   all: ["app"] as const,
   state: () => [...appKeys.all, "state"] as const,
   catalog: () => [...appKeys.all, "catalog"] as const,
+  claudeVersion: () => [...appKeys.all, "claude-version"] as const,
 }
 
 function useEventSync<T>(event: string, key: readonly unknown[]) {
@@ -26,6 +27,16 @@ function useEventSync<T>(event: string, key: readonly unknown[]) {
 export function useAppState() {
   useEventSync<AppState>("state", appKeys.state())
   return useQuery({ queryKey: appKeys.state(), queryFn: api.getState, staleTime: Infinity })
+}
+
+/** 설치된 Claude Code 버전 (claude --version) */
+export function useClaudeVersion() {
+  return useQuery({
+    queryKey: appKeys.claudeVersion(),
+    queryFn: api.claudeVersion,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
 }
 
 export function useCatalog() {

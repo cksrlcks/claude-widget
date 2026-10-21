@@ -1,22 +1,32 @@
 // Claude Code 로컬 설정(~/.claude) 읽기/쓰기 + 사용량/MCP/플러그인/스킬 조회
 use crate::store::{Integration, IntegrationResult};
 use serde_json::{json, Value};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::{
     fs,
-    os::windows::process::CommandExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// macOS의 Claude Code는 토큰(.credentials.json 내용)을 파일 대신 이 키체인 항목에 저장
+#[cfg(target_os = "macos")]
+const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
 pub fn now_ms() -> f64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as f64).unwrap_or(0.0)
 }
 
-fn home() -> PathBuf {
+#[cfg(windows)]
+pub fn home() -> PathBuf {
     PathBuf::from(std::env::var("USERPROFILE").unwrap_or_default())
+}
+#[cfg(not(windows))]
+pub fn home() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or_default())
 }
 fn cred_path() -> PathBuf {
     home().join(".claude").join(".credentials.json")
@@ -36,9 +46,28 @@ fn write_json_atomic(path: &Path, data: &Value) -> Result<(), String> {
     fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
 
+// macOS는 키체인 우선, 항목이 없으면 파일(설정에 따라 파일을 쓰는 경우)
+fn read_cred() -> Option<Value> {
+    #[cfg(target_os = "macos")]
+    if let Ok(Some(s)) = crate::keychain::read(KEYCHAIN_SERVICE) {
+        return serde_json::from_str(&s).ok();
+    }
+    read_json(&cred_path())
+}
+
+fn write_cred(cred: &Value) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    if matches!(crate::keychain::read(KEYCHAIN_SERVICE), Ok(Some(_))) || !cred_path().exists() {
+        let account = crate::keychain::account(KEYCHAIN_SERVICE)
+            .unwrap_or_else(|| std::env::var("USER").unwrap_or_default());
+        return crate::keychain::write(KEYCHAIN_SERVICE, &account, &cred.to_string(), true);
+    }
+    write_json_atomic(&cred_path(), cred)
+}
+
 /// 현재 로그인 상태 스냅샷: { accountUuid, oauth, organizationUuid, oauthAccount, cachedUsage }
 pub fn read_live_auth() -> Option<Value> {
-    let cred = read_json(&cred_path())?;
+    let cred = read_cred()?;
     let config = read_json(&config_path())?;
     let oauth = cred.get("claudeAiOauth")?.clone();
     let account = config.get("oauthAccount")?.clone();
@@ -55,14 +84,14 @@ pub fn read_live_auth() -> Option<Value> {
 
 /// 계정 정보만 교체하고 나머지 설정(mcpOAuth, projects, settings 등)은 그대로 유지
 pub fn apply_auth(auth: &Value) -> Result<(), String> {
-    let mut cred = read_json(&cred_path()).unwrap_or_else(|| json!({}));
+    let mut cred = read_cred().unwrap_or_else(|| json!({}));
     let obj = cred.as_object_mut().ok_or("credentials 형식 오류")?;
     obj.insert("claudeAiOauth".into(), auth["oauth"].clone());
     match auth.get("organizationUuid").filter(|v| !v.is_null()) {
         Some(org) => obj.insert("organizationUuid".into(), org.clone()),
         None => obj.remove("organizationUuid"),
     };
-    write_json_atomic(&cred_path(), &cred)?;
+    write_cred(&cred)?;
 
     let mut config = read_json(&config_path()).ok_or(".claude.json 읽기 실패")?;
     config.as_object_mut().ok_or(".claude.json 형식 오류")?.insert("oauthAccount".into(), auth["oauthAccount"].clone());
@@ -72,6 +101,7 @@ pub fn apply_auth(auth: &Value) -> Result<(), String> {
 pub fn backup_live_files(dir: &Path) {
     let _ = fs::create_dir_all(dir);
     let stamp = format!("{}", now_ms() as u64);
+    // macOS 키체인에 있는 토큰은 평문 파일로 꺼내 두지 않음 (파일로 쓰는 경우만 백업)
     for f in [cred_path(), config_path()] {
         if f.exists() {
             let name = f.file_name().unwrap().to_string_lossy().to_string();
@@ -115,15 +145,23 @@ pub fn summarize_usage(u: &Value) -> Value {
     json!({ "session": pick(&u["five_hour"]), "weekly": pick(&u["seven_day"]) })
 }
 
+#[cfg(windows)]
+fn claude_command() -> Command {
+    let mut cmd = Command::new("cmd");
+    cmd.arg("/C").arg("claude").creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+#[cfg(not(windows))]
+fn claude_command() -> Command {
+    Command::new("claude")
+}
+
 /// claude CLI 실행 (창 없이). strict면 종료 코드 실패 시 출력이 있어도 에러
 pub fn run_claude(args: &[&str], strict: bool) -> Result<String, String> {
-    let out = Command::new("cmd")
-        .arg("/C")
-        .arg("claude")
+    let out = claude_command()
         .args(args)
         .current_dir(home())
         .stdin(Stdio::null())
-        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
@@ -135,13 +173,142 @@ pub fn run_claude(args: &[&str], strict: bool) -> Result<String, String> {
     Ok(stdout)
 }
 
+/// 설치된 Claude Code 버전 ("2.1.153 (Claude Code)" → "2.1.153")
+pub fn claude_version() -> Result<String, String> {
+    let out = run_claude(&["--version"], true)?;
+    out.split_whitespace().next().map(String::from).filter(|v| !v.is_empty()).ok_or_else(|| "버전을 읽지 못했습니다".into())
+}
+
+/// Claude Code 업데이트 명령: Homebrew로 설치했으면 brew(claude update는 brew 설치를 갱신하지 않음), 아니면 자체 업데이트
+pub fn claude_update_command() -> &'static str {
+    #[cfg(not(windows))]
+    {
+        let installed = std::env::var("PATH").unwrap_or_default().split(':').map(|d| Path::new(d).join("claude")).find(|p| p.exists());
+        if installed.and_then(|p| fs::canonicalize(p).ok()).is_some_and(|p| p.to_string_lossy().contains("/Caskroom/")) {
+            return "brew upgrade --cask claude-code";
+        }
+    }
+    "claude update"
+}
+
 /// 보이는 터미널 창에서 명령 실행 (프롬프트·브라우저 인증용). 창이 닫힐 때까지 대기
+#[cfg(windows)]
 pub fn run_in_terminal(title: &str, command: &str) {
     let script = format!("{command} & echo. & echo Done. Press any key to close. & pause >nul");
     let _ = Command::new("cmd.exe")
         .raw_arg(format!("/c start \"{title}\" /wait cmd /c \"{script}\""))
         .creation_flags(CREATE_NO_WINDOW)
         .status();
+}
+
+/// 셸 인자용 작은따옴표 감싸기
+#[cfg(not(windows))]
+fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// macOS: zsh 스크립트를 Terminal.app 새 창에서 실행 (대화형 셸 창이라 사용자 PATH(nvm·homebrew 등)가 그대로 적용됨)
+/// 성공하면 그 창의 id
+#[cfg(not(windows))]
+fn open_in_terminal(body: &str) -> Option<String> {
+    let script = std::env::temp_dir().join(format!("claude-widget-{}-{}.sh", std::process::id(), now_ms() as u64));
+    // 스크립트는 시작하자마자 자기 파일을 지움
+    if fs::write(&script, format!("#!/bin/zsh\nrm -f \"$0\"\n{body}")).is_err() {
+        return None;
+    }
+    // do script는 새 창의 셸에 명령을 "입력"하는 방식이라, 셸 시작 중에 키 입력을 읽는 설정(oh-my-zsh 업데이트 질문 등)이
+    // 첫 글자를 가져가 버림 → 앞에 공백을 붙여 그 질문에는 공백(=아니오)이 가고 명령은 그대로 남게 함 (zsh는 앞 공백 무시)
+    let apple = format!(
+        "tell application \"Terminal\"\nactivate\ndo script \" exec /bin/zsh '{}'\"\nreturn id of front window\nend tell",
+        script.display()
+    );
+    let id = Command::new("osascript")
+        .args(["-e", &apple])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+    if id.is_none() {
+        let _ = fs::remove_file(&script);
+    }
+    id
+}
+
+/// macOS: 위젯이 연 Terminal 창 닫기. Terminal 설정이 "셸 종료 시 윈도우 닫지 않음"이면 [프로세스 완료됨]으로 남기 때문
+/// (이미 닫혔으면 아무 일 없음)
+#[cfg(not(windows))]
+fn close_terminal_window(id: &str) {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
+        return;
+    }
+    let apple = format!("tell application \"Terminal\" to close (every window whose id is {id})");
+    let _ = Command::new("osascript").args(["-e", &apple]).output();
+}
+
+/// macOS: Terminal.app 새 창에서 실행. 스크립트가 끝나면(키 입력·창 닫기) 표시 파일을 남기고, 그때까지 대기
+#[cfg(not(windows))]
+pub fn run_in_terminal(title: &str, command: &str) {
+    use std::time::{Duration, Instant};
+    let done = std::env::temp_dir().join(format!("claude-widget-{}-{}.done", std::process::id(), now_ms() as u64));
+    let touch = format!("touch {}", sh_quote(&done.to_string_lossy()));
+    let body = format!(
+        "trap {} EXIT\ntrap 'exit 1' HUP INT TERM\nprintf '\\e]0;%s\\a' {}\nclear\n{command}\necho\necho 'Done. Press any key to close.'\nread -sk 1\n",
+        sh_quote(&touch),
+        sh_quote(title),
+    );
+    if let Some(window) = open_in_terminal(&body) {
+        let deadline = Instant::now() + Duration::from_secs(30 * 60);
+        while !done.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(500));
+        }
+        if done.exists() {
+            // 표시 파일은 셸이 끝나기 직전(EXIT trap)에 생김 → 셸이 완전히 끝난 뒤 닫아야 "종료할까요?"를 묻지 않음
+            std::thread::sleep(Duration::from_millis(500));
+            close_terminal_window(&window);
+        }
+    }
+    let _ = fs::remove_file(&done);
+}
+
+/// Finder·로그인 항목으로 실행된 앱은 PATH가 /usr/bin:/bin 정도라 claude를 못 찾음
+/// → 로그인 셸의 PATH를 가져와 적용 (스레드를 만들기 전, 시작할 때 한 번 호출)
+#[cfg(not(windows))]
+pub fn fix_path_env() {
+    use std::time::{Duration, Instant};
+    const MARK: &str = "__CLAUDE_WIDGET_PATH__";
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let mut path = String::new();
+    if let Ok(mut child) = Command::new(&shell)
+        .args(["-ilc", &format!("printf '{MARK}%s{MARK}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        // 셸 설정이 멈춰도 앱 시작이 막히지 않게 5초 제한
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while matches!(child.try_wait(), Ok(None)) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let _ = child.kill();
+        if let Ok(out) = child.wait_with_output() {
+            let text = String::from_utf8_lossy(&out.stdout).to_string();
+            if let Some(v) = text.split(MARK).nth(1) {
+                path = v.to_string();
+            }
+        }
+    }
+    if path.is_empty() {
+        path = std::env::var("PATH").unwrap_or_default();
+    }
+    // 셸 설정에서 못 가져온 경우를 위해 Claude Code·Homebrew 기본 설치 위치 추가
+    let mut parts: Vec<String> = path.split(':').filter(|p| !p.is_empty()).map(String::from).collect();
+    for extra in [home().join(".local/bin").display().to_string(), "/opt/homebrew/bin".into(), "/usr/local/bin".into()] {
+        if !parts.contains(&extra) {
+            parts.push(extra);
+        }
+    }
+    std::env::set_var("PATH", parts.join(":"));
 }
 
 // "name: target - ✓ Connected" 형식 파싱
@@ -368,6 +535,7 @@ pub fn list_skills(org: Option<&str>, account: Option<&str>) -> Value {
 }
 
 // 실행 중인 Claude Code 세션 수 (데스크톱 앱 본체 Claude.exe는 제외)
+#[cfg(windows)]
 pub fn count_claude_processes() -> usize {
     let ps = "@(Get-Process claude -ErrorAction SilentlyContinue | ? { $_.Path -and $_.Path -notlike '*\\WindowsApps\\*' }).Count";
     Command::new("powershell")
@@ -379,9 +547,20 @@ pub fn count_claude_processes() -> usize {
         .unwrap_or(0)
 }
 
+// macOS: 이름이 정확히 claude인 프로세스 (데스크톱 앱 본체는 "Claude"라 제외됨)
+#[cfg(not(windows))]
+pub fn count_claude_processes() -> usize {
+    Command::new("pgrep")
+        .args(["-x", "claude"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.trim().is_empty()).count())
+        .unwrap_or(0)
+}
+
 // ---------- 원격 세션 전환 ----------
 
 /// pid부터 부모를 따라 올라가며 가장 가까운 Claude Code(claude.exe) pid를 찾음 (데스크톱 앱 Claude.exe 제외)
+#[cfg(windows)]
 pub fn find_claude_ancestor(pid: u32) -> Option<u32> {
     let ps = format!(
         "$all=@{{}}; Get-CimInstance Win32_Process | % {{ $all[[int]$_.ProcessId]=$_ }}; $id={pid}; \
@@ -395,6 +574,37 @@ pub fn find_claude_ancestor(pid: u32) -> Option<u32> {
         .output()
         .ok()?;
     String::from_utf8_lossy(&out.stdout).trim().parse().ok()
+}
+
+/// macOS: (pid, ppid, 실행 파일 경로) 목록
+#[cfg(not(windows))]
+fn process_table() -> Vec<(u32, u32, String)> {
+    let Ok(out) = Command::new("ps").args(["-A", "-o", "pid=,ppid=,comm="]).output() else { return vec![] };
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| {
+            let mut it = l.trim_start().splitn(2, char::is_whitespace);
+            let pid = it.next()?.parse().ok()?;
+            let mut it = it.next()?.trim_start().splitn(2, char::is_whitespace);
+            let ppid = it.next()?.parse().ok()?;
+            Some((pid, ppid, it.next().unwrap_or("").trim().to_string()))
+        })
+        .collect()
+}
+
+/// macOS: 실행 파일 이름이 claude인 가장 가까운 조상 (데스크톱 앱 본체는 "Claude"라 제외됨)
+#[cfg(not(windows))]
+pub fn find_claude_ancestor(pid: u32) -> Option<u32> {
+    let table = process_table();
+    let mut id = pid;
+    for _ in 0..16 {
+        let (_, ppid, comm) = table.iter().find(|p| p.0 == id)?;
+        if Path::new(comm).file_name().is_some_and(|n| n == "claude") {
+            return Some(id);
+        }
+        id = *ppid;
+    }
+    None
 }
 
 pub fn valid_session_id(id: &str) -> bool {
@@ -417,6 +627,7 @@ pub fn newest_session(cwd: &Path) -> Option<String> {
         .filter(|s| valid_session_id(s))
 }
 
+#[cfg(windows)]
 pub fn kill_tree(pid: u32) {
     let _ = Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/T", "/F"])
@@ -424,9 +635,57 @@ pub fn kill_tree(pid: u32) {
         .status();
 }
 
+/// macOS: pid와 모든 자식 프로세스를 강제 종료 (taskkill /T /F와 같게)
+#[cfg(not(windows))]
+pub fn kill_tree(pid: u32) {
+    // 0·1은 프로세스 그룹·launchd라 절대 보내면 안 됨
+    if pid <= 1 {
+        return;
+    }
+    let table = process_table();
+    let mut tree = vec![pid];
+    let mut i = 0;
+    while i < tree.len() {
+        let parent = tree[i];
+        tree.extend(table.iter().filter(|p| p.1 == parent && p.0 > 1).map(|p| p.0));
+        i += 1;
+    }
+    let _ = Command::new("/bin/kill").arg("-KILL").args(tree.iter().map(|p| p.to_string())).status();
+}
+
+/// 다시 띄운 세션 (롤백 판단용으로 살아 있는지 확인)
+pub struct RemoteProcess {
+    #[cfg(windows)]
+    child: std::process::Child,
+    /// macOS: Terminal 창의 스크립트가 exec 직전에 남기는 claude pid
+    #[cfg(not(windows))]
+    pid_file: PathBuf,
+}
+
+impl RemoteProcess {
+    #[cfg(windows)]
+    pub fn running(&mut self) -> bool {
+        self.child.try_wait().ok().flatten().is_none()
+    }
+
+    #[cfg(not(windows))]
+    pub fn running(&mut self) -> bool {
+        let Some(pid) = fs::read_to_string(&self.pid_file).ok().and_then(|s| s.trim().parse::<u32>().ok()) else { return false };
+        Command::new("/bin/kill").args(["-0", &pid.to_string()]).status().is_ok_and(|s| s.success())
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for RemoteProcess {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.pid_file);
+    }
+}
+
 /// 새 콘솔 창에서 `claude --resume <id> --remote-control` 실행. fork면 대화를 복사한 새 세션으로
 /// (--name은 붙이지 않음: 같은 세션을 이어갈 때 원래 대화 제목을 덮어씀)
-pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::process::Child, String> {
+#[cfg(windows)]
+pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<RemoteProcess, String> {
     const CREATE_NEW_CONSOLE: u32 = 0x10;
     // 시작 시 확인 질문이 뜨면 아무도 답할 수 없어 Remote Control 등록 전에 멈춤 → 질문을 띄우는 설정을 미리 꺼 둠
     let settings = unattended_settings(cwd);
@@ -440,10 +699,40 @@ pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<std::proce
         .current_dir(cwd)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
+        .map(|child| RemoteProcess { child })
         .map_err(|e| e.to_string())
 }
 
+/// macOS: Terminal.app 새 창에서 실행 (Windows의 새 콘솔 창과 같은 역할)
+#[cfg(not(windows))]
+pub fn launch_remote(cwd: &Path, session: &str, fork: bool) -> Result<RemoteProcess, String> {
+    let settings = unattended_settings(cwd);
+    let title = fs::read_to_string(project_dir(cwd).join(format!("{session}.jsonl"))).ok().and_then(|t| session_title(&t));
+    let mut args: Vec<String> = ["claude", "--resume", session, "--remote-control"].map(String::from).to_vec();
+    args.extend(title);
+    if fork {
+        args.push("--fork-session".into());
+    }
+    if let Some(p) = settings {
+        args.extend(["--settings".into(), p.to_string_lossy().to_string()]);
+    }
+    let pid_file = std::env::temp_dir().join(format!("claude-widget-remote-{session}-{}.pid", now_ms() as u64));
+    let command = args.iter().map(|a| sh_quote(a)).collect::<Vec<_>>().join(" ");
+    // exec로 claude가 이 셸의 pid를 그대로 이어받음 → pid 파일로 생존 확인
+    let body = format!(
+        "cd {} || exit 1\necho $$ > {}\nexec {command}\n",
+        sh_quote(&cwd.to_string_lossy()),
+        sh_quote(&pid_file.to_string_lossy())
+    );
+    // 원격으로 이어 쓰는 세션 창이라 위젯이 닫지 않음
+    if open_in_terminal(&body).is_none() {
+        return Err("터미널 실행 실패".into());
+    }
+    Ok(RemoteProcess { pid_file })
+}
+
 /// 대화 기록(jsonl)의 제목: 마지막 custom-title(직접 지정), 없으면 마지막 ai-title. cmd /c로 넘기므로 셸 특수문자 제거
+/// (macOS는 sh_quote로 감싸므로 그대로 써도 됨)
 fn session_title(jsonl: &str) -> Option<String> {
     let (mut custom, mut ai, mut first) = (None, None, None);
     for line in jsonl.lines().filter(|l| l.contains("-title\"") || l.contains("\"type\":\"user\"")) {
@@ -556,7 +845,7 @@ mod tests {
     fn switch_command_respects_user_edits() {
         let dir = std::env::temp_dir().join("cw-switch-test");
         let _ = std::fs::remove_dir_all(&dir);
-        std::env::set_var("USERPROFILE", &dir);
+        std::env::set_var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }, &dir);
         let path = dir.join(".claude/commands/switch.md");
         super::install_switch_command();
         let text = std::fs::read_to_string(&path).unwrap();
@@ -565,7 +854,7 @@ mod tests {
         super::install_switch_command();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "user edit");
 
-        // 같은 테스트에서: USERPROFILE을 바꾸므로 병렬로 돌면 서로 간섭함
+        // 같은 테스트에서: USERPROFILE(macOS는 HOME)을 바꾸므로 병렬로 돌면 서로 간섭함
         let settings = dir.join(".claude/settings.json");
         let other = serde_json::json!({ "matcher": "Bash", "hooks": [{ "type": "command", "command": "gk hook" }] });
         std::fs::write(&settings, serde_json::json!({ "model": "opus", "hooks": { "PostToolUse": [other] } }).to_string()).unwrap();

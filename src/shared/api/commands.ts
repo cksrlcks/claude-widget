@@ -39,6 +39,11 @@ export const api = {
   checkUpdate: () => invoke<void>("check_update_cmd"),
   installUpdate: () => invoke<void>("install_update_cmd"),
 
+  // Claude Code CLI
+  claudeVersion: () => invoke<string>("claude_version_cmd"),
+  /** 터미널 창에서 업데이트, 창이 닫히면 끝남 */
+  updateClaude: () => invoke<void>("update_claude_cmd"),
+
   // 플러그인 스토어
   getCatalog: () => invoke<Catalog>("store_catalog"),
   reloadCatalog: () => invoke<void>("store_reload"),

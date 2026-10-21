@@ -1,6 +1,7 @@
 import { Download, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ClaudeCodeUpdate } from "@/features/updates/components/claude-code-update"
 import { useConfirm } from "@/hooks/use-confirm"
 import { cn } from "@/lib/utils"
 import { api } from "@/shared/api/commands"
@@ -85,6 +86,7 @@ export function UpdateSection({ update: u, className }: Props) {
           <p className="text-muted-foreground border-t pt-3 text-xs whitespace-pre-wrap">{u.available.notes}</p>
         )}
       </div>
+      <ClaudeCodeUpdate />
     </Section>
   )
 }
