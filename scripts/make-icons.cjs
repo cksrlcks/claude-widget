@@ -1,4 +1,5 @@
-// Clawd 픽셀 아이콘 생성: assets/icon.png(256), assets/tray.png(32), assets/icon.ico(16~256)
+// Clawd 픽셀 아이콘 생성: assets/icon.png(256), assets/tray.png(32), assets/icon.ico(16~256),
+// src-tauri/icons/icon.icns(macOS, 16~1024)
 // 실행: node scripts/make-icons.js
 const fs = require("fs")
 const path = require("path")
@@ -98,6 +99,30 @@ function ico(images) {
   return Buffer.concat([header, ...entries, ...images.map((i) => i.data)])
 }
 
+// PNG를 그대로 담는 ICNS (macOS 10.7 이상). [타입, 픽셀 크기]
+function icns(entries) {
+  const parts = entries.map(([type, data]) => {
+    const head = Buffer.alloc(8)
+    head.write(type, 0, "ascii")
+    head.writeUInt32BE(data.length + 8, 4)
+    return Buffer.concat([head, data])
+  })
+  const head = Buffer.alloc(8)
+  head.write("icns", 0, "ascii")
+  head.writeUInt32BE(8 + parts.reduce((n, p) => n + p.length, 0), 4)
+  return Buffer.concat([head, ...parts])
+}
+
+// macOS 아이콘은 캔버스의 약 80%만 채우고 둘레를 비워야 Dock에서 다른 앱과 크기가 맞음
+function padded(size) {
+  const inner = Math.round(size * 0.8)
+  const src = draw(inner, true)
+  const dst = Buffer.alloc(size * size * 4)
+  const o = Math.floor((size - inner) / 2)
+  for (let y = 0; y < inner; y++) src.copy(dst, ((y + o) * size + o) * 4, y * inner * 4, (y + 1) * inner * 4)
+  return dst
+}
+
 const out = path.join(__dirname, "..", "assets")
 fs.mkdirSync(out, { recursive: true })
 fs.writeFileSync(path.join(out, "icon.png"), png(256, draw(256, true)))
@@ -121,4 +146,20 @@ fs.writeFileSync(
   path.join(out, "icon.ico"),
   ico([16, 24, 32, 48, 64, 128, 256].map((s) => ({ size: s, data: png(s, draw(s, true)) })))
 )
-console.log("assets/icon.png, assets/tray.png, assets/icon.ico 생성")
+const ICNS_TYPES = [
+  ["icp4", 16],
+  ["ic11", 32],
+  ["icp5", 32],
+  ["ic12", 64],
+  ["ic07", 128],
+  ["ic13", 256],
+  ["ic08", 256],
+  ["ic14", 512],
+  ["ic09", 512],
+  ["ic10", 1024],
+]
+fs.writeFileSync(
+  path.join(__dirname, "..", "src-tauri", "icons", "icon.icns"),
+  icns(ICNS_TYPES.map(([type, size]) => [type, png(size, padded(size))]))
+)
+console.log("assets/icon.png, assets/tray.png, assets/icon.ico, src-tauri/icons/icon.icns 생성")

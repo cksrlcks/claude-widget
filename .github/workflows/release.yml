@@ -1,0 +1,69 @@
+# v* 태그를 push하면 Windows·macOS(Universal)를 빌드해 Release 초안에 올림
+# - 업데이터용 latest.json(windows-x86_64, darwin-aarch64, darwin-x86_64)도 자동 생성
+# - 초안을 확인한 뒤 Publish해야 기존 사용자에게 업데이트가 감
+# - 서명 키는 prod 환경 Secrets: TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+# PR·수동 실행은 빌드만 확인: 서명 키 없이(업데이트 파일 생략) 빌드하고 설치 파일을 Actions 아티팩트로 남김
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.platform }}
+    # 서명 키가 든 prod 환경은 릴리스 태그 빌드에서만 사용
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'prod' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Universal은 두 아키텍처를 각각 빌드해 합침
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # 태그가 아니면 비워 둠 → 빌드만 하고 Release는 만들지 않음
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: "v__VERSION__"
+          releaseBody: "변경 내용을 적어 주세요."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}${{ !startsWith(github.ref, 'refs/tags/v') && ' --config src-tauri/tauri.check.conf.json' || '' }}
+
+      - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
