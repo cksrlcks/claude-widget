@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
+    "tauri": "tauri",
     "dev:web": "vite",
     "build:web": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
