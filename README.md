@@ -65,13 +65,15 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
   "%LOCALAPPDATA%\Claude Widget\claude-widget.exe" switch <계정 라벨|이메일> [--session <세션ID>]
   ```
 
+  macOS: `"/Applications/Claude Widget.app/Contents/MacOS/claude-widget" switch ...`
+
 1. 위젯이 계정을 교체 (확인창 없음)
-2. 터미널(CLI) 세션: 5초 뒤 그 Claude Code 프로세스를 종료하고 새 콘솔 창에서 `claude --resume <세션ID> --remote-control <대화 제목>`으로 같은 대화를 재실행
+2. 터미널(CLI) 세션: 5초 뒤 그 Claude Code 프로세스를 종료하고 새 콘솔 창(macOS는 Terminal 창)에서 `claude --resume <세션ID> --remote-control <대화 제목>`으로 같은 대화를 재실행
 3. VS Code·데스크톱 앱 세션: 종료하면 패널이 깨지므로 그대로 두고, `--fork-session`으로 대화를 복사한 새 세션을 새 콘솔 창에 띄움
 4. 다시 띄울 때 승인 안 된 프로젝트 MCP(`.mcp.json`)는 꺼서, 시작 확인 질문에 막혀 Remote Control이 안 켜지는 일을 막음
 5. 30초 안에 새 프로세스가 죽으면 이전 계정으로 롤백
 
-세션 ID를 안 주면 현재 폴더 프로젝트에서 가장 최근 세션을 씁니다. 결과는 `%APPDATA%\claude-widget\remote-switch.log`에 남습니다.
+세션 ID를 안 주면 현재 폴더 프로젝트에서 가장 최근 세션을 씁니다. 결과는 데이터 폴더의 `remote-switch.log`에 남습니다.
 
 </details>
 
