@@ -18,6 +18,7 @@ export function WatchSection({ state, className }: Props) {
   const { known, items, watch, checking, checkedAt, error } = state.integrations
   const current = new Map(items.map((i) => [i.key, i]))
   const watchAll = watch === null
+  const watchedCount = watchAll ? known.length : known.filter((k) => watch.includes(k.key)).length
 
   const toggle = (key: string, on: boolean) => {
     const base = watch ?? known.map((k) => k.key)
@@ -46,6 +47,28 @@ export function WatchSection({ state, className }: Props) {
           <Switch checked={watchAll} onCheckedChange={(on) => api.setWatch(on ? null : known.map((k) => k.key))} />
         </SettingRow>
       </SettingGroup>
+      {known.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground text-[11.5px]">
+            {known.length}개 중 {watchedCount}개 감시
+          </span>
+          <div className="flex gap-1">
+            {/* 지금 있는 항목만 켬. 새 항목까지 자동 포함은 위의 "전체 감시"가 담당 */}
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={watchedCount === known.length}
+              onClick={() => api.setWatch(known.map((k) => k.key))}
+            >
+              모두 켜기
+            </Button>
+            {/* "전체 감시"가 켜져 있어도 함께 꺼서 한 번에 모두 끔 */}
+            <Button variant="ghost" size="xs" disabled={watchedCount === 0} onClick={() => api.setWatch([])}>
+              모두 끄기
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="bg-card divide-y overflow-x-hidden rounded-[10px] border">
         {known.length ? (
           known.map((k) => (
