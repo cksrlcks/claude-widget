@@ -110,3 +110,23 @@ export type Catalog = {
 
 export type PluginAction = "uninstall" | "enable" | "disable"
 export type MarketplaceAction = "add" | "remove"
+
+/** 설정 > 토큰 사용: 실행 폴더별 집계 (src-tauri/src/tokens.rs) */
+export type ProjectTokens = {
+  path: string
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  /** 사람이 직접 보낸 질문 수 */
+  prompts: number
+  /** 요청마다 맥락이 10만 토큰을 넘은 부분의 합 */
+  excess: number
+  requests: number
+  subRequests: number
+  rewrites: number
+  sessions: number
+  baseline: number
+  bigOutputs: number
+  bigTools: [string, number][]
+}

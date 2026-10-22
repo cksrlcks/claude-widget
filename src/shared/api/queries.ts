@@ -11,6 +11,7 @@ export const appKeys = {
   state: () => [...appKeys.all, "state"] as const,
   catalog: () => [...appKeys.all, "catalog"] as const,
   claudeVersion: () => [...appKeys.all, "claude-version"] as const,
+  tokenUsage: () => [...appKeys.all, "token-usage"] as const,
 }
 
 function useEventSync<T>(event: string, key: readonly unknown[]) {
@@ -42,4 +43,9 @@ export function useClaudeVersion() {
 export function useCatalog() {
   useEventSync<Catalog>("catalog", appKeys.catalog())
   return useQuery({ queryKey: appKeys.catalog(), queryFn: api.getCatalog, staleTime: Infinity })
+}
+
+/** 프로젝트별 토큰 사용량 — 기록 전체를 읽어 몇 초 걸리므로 탭을 다시 열 때 1분 안이면 재사용 */
+export function useTokenUsage() {
+  return useQuery({ queryKey: appKeys.tokenUsage(), queryFn: api.tokenUsage, staleTime: 60_000 })
 }

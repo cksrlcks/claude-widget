@@ -2,7 +2,15 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
-import type { AppState, Catalog, MarketplaceAction, PluginAction, ProfilePatch, WidgetAnchor } from "@/shared/types"
+import type {
+  AppState,
+  Catalog,
+  MarketplaceAction,
+  PluginAction,
+  ProfilePatch,
+  ProjectTokens,
+  WidgetAnchor,
+} from "@/shared/types"
 
 export const api = {
   // 상태
@@ -43,6 +51,9 @@ export const api = {
   claudeVersion: () => invoke<string>("claude_version_cmd"),
   /** 터미널 창에서 업데이트, 창이 닫히면 끝남 */
   updateClaude: () => invoke<void>("update_claude_cmd"),
+
+  // 토큰 사용
+  tokenUsage: () => invoke<ProjectTokens[]>("token_usage_cmd"),
 
   // 플러그인 스토어
   getCatalog: () => invoke<Catalog>("store_catalog"),

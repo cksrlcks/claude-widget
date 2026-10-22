@@ -5,6 +5,7 @@ mod crypto;
 #[cfg(target_os = "macos")]
 mod keychain;
 mod store;
+mod tokens;
 mod updates;
 
 use serde_json::{json, Value};
@@ -695,14 +696,14 @@ fn open_window(app: &AppHandle, label: &str, file: &str, title: &str, size: (f64
 }
 
 fn open_settings(app: &AppHandle) {
-    open_window(app, "settings", "settings.html", "Claude 위젯 설정", (760.0, 560.0));
+    open_window(app, "settings", "settings.html", "Claude 위젯 설정", (960.0, 560.0));
 }
 
 /// 스토어는 설정 창의 한 페이지. 새 창이면 #store로 열고, 이미 열려 있으면 이벤트로 페이지를 바꿈.
 /// 카탈로그는 스토어 페이지가 열릴 때 프런트에서 불러옴
 fn open_store(app: &AppHandle) {
     let _ = app.emit_to("settings", "settings-page", "store");
-    open_window(app, "settings", "settings.html#store", "Claude 위젯 설정", (760.0, 560.0));
+    open_window(app, "settings", "settings.html#store", "Claude 위젯 설정", (960.0, 560.0));
 }
 
 fn toggle_widget(app: &AppHandle) {
@@ -1020,6 +1021,12 @@ async fn claude_version_cmd() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(claude::claude_version).await.map_err(|e| e.to_string())?
 }
 
+/// 설정 > 토큰 사용: 대화 기록 전체를 읽어 프로젝트별로 집계 (기록이 크면 몇 초 걸림)
+#[tauri::command]
+async fn token_usage_cmd() -> Result<Vec<tokens::ProjectTokens>, String> {
+    tauri::async_runtime::spawn_blocking(tokens::scan).await.map_err(|e| e.to_string())
+}
+
 /// 터미널 창에서 업데이트하고, 창이 닫히면 끝남 (화면은 그 뒤 버전을 다시 읽음)
 #[tauri::command]
 async fn update_claude_cmd() -> Result<(), String> {
@@ -1167,6 +1174,7 @@ fn main() {
             install_update_cmd,
             claude_version_cmd,
             update_claude_cmd,
+            token_usage_cmd,
         ])
         .on_menu_event(|app, e| handle_menu(app, e.id().as_ref()))
         .setup(|app| {

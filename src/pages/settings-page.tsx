@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
 import { listen } from "@tauri-apps/api/event"
-import { Boxes, Plug, Settings, Store, User, type LucideIcon } from "lucide-react"
+import { Boxes, ChartColumn, Plug, Settings, Store, User, type LucideIcon } from "lucide-react"
 
 import { AccountSection } from "@/features/accounts/components/account-section"
 import { GeneralSection } from "@/features/general/components/general-section"
 import { WatchSection } from "@/features/integrations/components/watch-section"
 import { InventorySection } from "@/features/inventory/components/inventory-section"
+import { TokenSection } from "@/features/tokens/components/token-section"
 import { UpdateSection } from "@/features/updates/components/update-section"
 import { cn } from "@/lib/utils"
 import { StorePage } from "@/pages/store-page"
@@ -13,13 +14,14 @@ import { useAppState } from "@/shared/api/queries"
 import { ProfileAvatar } from "@/shared/components/profile-avatar"
 import type { AppState } from "@/shared/types"
 
-type PageKey = "accounts" | "watch" | "inventory" | "store" | "general" | "update"
+type PageKey = "accounts" | "watch" | "inventory" | "store" | "tokens" | "general" | "update"
 
 const NAV: { key: PageKey; label: string; icon: LucideIcon }[] = [
   { key: "accounts", label: "계정", icon: User },
   { key: "watch", label: "MCP 감시", icon: Plug },
   { key: "inventory", label: "스킬 · 플러그인", icon: Boxes },
   { key: "store", label: "플러그인 스토어", icon: Store },
+  { key: "tokens", label: "토큰 사용", icon: ChartColumn },
   { key: "general", label: "일반", icon: Settings },
 ]
 
@@ -28,6 +30,7 @@ const PAGES: Record<PageKey, (s: AppState) => React.ReactNode> = {
   watch: (s) => <WatchSection state={s} />,
   inventory: (s) => <InventorySection state={s} />,
   store: () => <StorePage />,
+  tokens: () => <TokenSection />,
   general: (s) => <GeneralSection state={s} />,
   update: (s) => <UpdateSection update={s.update} />,
 }
