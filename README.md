@@ -12,6 +12,7 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 - **사용량 경고**: 사용량이 기준(기본 90%)을 넘으면 Claude가 세션 안에서 계정 전환을 물어봄 (옵션)
 - **MCP·플러그인 상태**: 감시 중인 항목 중 끊어진 개수, 클릭으로 MCP 로그인
 - **스킬·플러그인**: 설치된 목록, 플러그인 스토어(마켓플레이스 추가·설치·제거)
+- **토큰 사용 분석**: 프로젝트(세션을 시작한 폴더)별 토큰 사용량과 질문당 토큰을 내 평균과 비교해, 같은 일에 토큰을 더 쓰는 곳과 원인(긴 대화·서브에이전트·큰 출력 등)·줄이는 방법을 보여줌
 - **테마**: 라이트(크림) / 다크 — 위젯과 설정 창에 함께 적용
 - **아바타**: 도트 캐릭터 8종(움직임 끄기 가능) 또는 내 이미지·GIF
 - **위치**: 드래그한 곳에 두거나 네 모서리 중 한 곳에 고정
@@ -119,6 +120,7 @@ src/                        # 화면 (Vite + React + TS, Tailwind, shadcn/ui)
 │   ├── integrations/       # 설정 > 감시할 MCP·플러그인
 │   ├── inventory/          # 설정 > 설치된 스킬·플러그인
 │   ├── general/            # 설정 > 일반
+│   ├── tokens/             # 설정 > 토큰 사용
 │   └── store/              # 설정 > 플러그인 스토어
 ├── shared/
 │   ├── api/                # Tauri 명령(commands), Query 훅(queries), 액션(mutations)
@@ -131,6 +133,7 @@ src-tauri/src/              # 백엔드 (Rust)
 ├── main.rs                 # 창·트레이·메뉴, 프런트에서 부르는 명령, 원격 전환
 ├── claude.rs               # ~/.claude 읽기/쓰기, claude CLI 호출, 사용량 API, /switch·훅 설치
 ├── store.rs                # store.json, 토큰 저장
+├── tokens.rs               # 대화 기록(~/.claude/projects) 토큰 사용량 집계
 ├── crypto.rs               # 토큰 암호화 (Windows DPAPI·Electron 토큰 이전 / macOS AES + 키체인 키)
 ├── keychain.rs             # macOS 키체인 읽기/쓰기 (/usr/bin/security)
 └── updates.rs              # 자동 업데이트
