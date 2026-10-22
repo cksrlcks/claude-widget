@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": resolve(__dirname, "src") } },
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  // Rust 쪽은 Tauri가 감시. target의 exe를 감시하면 Windows에서 빌드 중 잠겨 EBUSY로 죽음
+  server: { port: 1420, strictPort: true, watch: { ignored: ["**/src-tauri/**"] } },
   build: {
     target: "es2022",
     rollupOptions: {
