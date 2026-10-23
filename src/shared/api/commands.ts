@@ -15,8 +15,12 @@ import type {
 export const api = {
   // 상태
   getState: () => invoke<AppState>("get_state"),
+  /** 모든 계정의 사용량을 지금 다시 확인 */
   refresh: () => invoke<void>("refresh"),
   recheck: () => invoke<void>("recheck"),
+  openLogs: () => invoke<void>("open_logs"),
+  /** 화면 오류를 widget.log에 남김 */
+  log: (msg: string) => invoke<void>("log_frontend", { msg }),
 
   // 창
   openSettings: () => invoke<void>("open_settings_cmd"),

@@ -1,6 +1,6 @@
 [package]
 name = "claude-widget"
-version = "1.7.0"
+version = "1.7.1"
 edition = "2021"
 
 [build-dependencies]
@@ -19,6 +19,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 tokio = { version = "1", features = ["time"] }
 aes-gcm = "0.10"
 base64 = "0.22"
+# 로그 시각용. tauri-plugin-updater가 이미 끌어오는 크레이트라 추가 비용 없음
+time = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

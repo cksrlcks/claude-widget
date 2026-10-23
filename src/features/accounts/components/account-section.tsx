@@ -1,8 +1,9 @@
-import { Plus } from "lucide-react"
+import { Plus, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ProfileCard } from "@/features/accounts/components/profile-card"
 import { api } from "@/shared/api/commands"
+import { useRefreshUsage } from "@/shared/api/mutations"
 import { Section } from "@/shared/components/section"
 import { SettingGroup, SettingRow } from "@/shared/components/setting-row"
 import type { AppState } from "@/shared/types"
@@ -13,15 +14,27 @@ type Props = {
 }
 
 export function AccountSection({ state, className }: Props) {
+  const refresh = useRefreshUsage()
   return (
     <Section
       title="계정"
       description="계정을 저장해 두고 클릭 한 번으로 전환합니다"
       className={className}
       action={
-        <Button variant="secondary" size="sm" onClick={() => api.loginNew()}>
-          <Plus /> 계정 추가
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="모든 계정의 사용량 다시 확인"
+            disabled={refresh.isPending}
+            onClick={() => refresh.mutate()}
+          >
+            <RefreshCw className={refresh.isPending ? "animate-spin" : undefined} />
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => api.loginNew()}>
+            <Plus /> 계정 추가
+          </Button>
+        </div>
       }
     >
       {state.profiles.length ? (

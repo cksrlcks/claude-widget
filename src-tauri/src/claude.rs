@@ -40,7 +40,7 @@ fn read_json(path: &Path) -> Option<Value> {
 }
 
 // 임시 파일에 쓰고 rename → 쓰는 도중 Claude Code가 읽어도 깨진 JSON을 보지 않게
-fn write_json_atomic(path: &Path, data: &Value) -> Result<(), String> {
+pub fn write_json_atomic(path: &Path, data: &Value) -> Result<(), String> {
     let tmp = path.with_extension("widget-tmp");
     fs::write(&tmp, serde_json::to_string_pretty(data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     fs::rename(&tmp, path).map_err(|e| e.to_string())

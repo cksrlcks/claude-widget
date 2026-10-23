@@ -29,6 +29,14 @@ export function useRemoveProfile() {
   })
 }
 
+export function useRefreshUsage() {
+  return useMutation({
+    mutationFn: api.refresh,
+    onSuccess: () => toast.success("사용량을 다시 확인했습니다"),
+    onError: (err) => toast.error(errorMessage(err, "사용량 확인에 실패했습니다")),
+  })
+}
+
 export function useUpdateProfile() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ProfilePatch }) => api.updateProfile(id, patch),

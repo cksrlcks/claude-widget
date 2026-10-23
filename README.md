@@ -6,7 +6,7 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 
 ## 기능
 
-- **계정·사용량**: 현재 로그인 계정과 세션(5시간)·주간 사용량 %
+- **계정·사용량**: 현재 로그인 계정과 세션(5시간)·주간 사용량 %. 설정의 계정 목록에서 새로고침하면 저장된 다른 계정의 사용량도 다시 확인
 - **계정 전환**: 여러 계정을 저장해 두고 클릭으로 전환 (MCP·플러그인·settings는 그대로, 계정 정보만 교체)
 - **원격 계정 전환**: Remote Control로 쓰던 세션을 `/switch`로 다른 계정에 넘겨 이어가기 → [쉬운 설명](docs/remote-switch.md)
 - **사용량 경고**: 사용량이 기준(기본 90%)을 넘으면 Claude가 세션 안에서 계정 전환을 물어봄 (옵션)
@@ -49,6 +49,8 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 3. 이후 설정이나 우클릭 메뉴에서 전환합니다.
 
 - 이미 실행 중인 Claude Code 세션은 재시작해야 새 계정이 적용됩니다.
+- 계정 목록의 사용량은 마지막으로 확인한 값입니다(마우스를 올리면 확인 시각). 새로고침(↻)을 누르면 다른 계정도 저장된 토큰으로 다시 확인합니다. 토큰이 만료된 계정(약 8시간 이상 안 쓴 계정)은 그 계정으로 전환할 때 갱신됩니다.
+- 요금제 표시는 Claude Code가 갱신하는 계정 정보(`oauthAccount.organizationType`)를 따릅니다. 요금제를 바꾼 뒤 바로 안 바뀌면 Claude Code를 한 번 실행하세요.
 - Claude 데스크톱 앱의 로그인은 별개라 바뀌지 않습니다.
 
 ### 원격 계정 전환 (`/switch`)
@@ -76,6 +78,8 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 
 세션 ID를 안 주면 현재 폴더 프로젝트에서 가장 최근 세션을 씁니다. 결과는 데이터 폴더의 `remote-switch.log`에 남습니다.
 
+리눅스 서버·WSL에서 Claude Code를 쓰는 경우는 위젯이 닿지 않습니다 → [리눅스에서의 방법 탐구](docs/remote-switch-linux.md)
+
 </details>
 
 ### 사용량 기준 전환 물어보기
@@ -87,7 +91,8 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 
 데이터 폴더: Windows `%APPDATA%/claude-widget`, macOS `~/Library/Application Support/claude-widget`
 
-- `%APPDATA%/claude-widget/store.json` — 프로필 메타, 감시 목록, 위치, 설정
+- `%APPDATA%/claude-widget/store.json` — 프로필 메타, 감시 목록, 위치, 설정. 읽을 수 없게 깨져 있으면 `store.json.bad`로 옮겨 두고 새로 시작합니다 (계정 목록이 비면 이 파일을 확인)
+- `%APPDATA%/claude-widget/widget.log` — 오류·전환 기록 (시각은 UTC, 토큰은 기록하지 않음, 1MB 넘으면 `widget.log.1`로 넘김). 문제가 생기면 설정 왼쪽 아래 버전 → "로그 폴더 열기"에서 이 파일을 보내 주세요
 - `%APPDATA%/claude-widget/secrets/*.dpapi` — 계정 토큰 (Windows DPAPI 암호화, 그 PC의 같은 사용자만 열 수 있음). 이전 Electron 버전의 `*.bin`은 첫 실행 때 자동으로 옮겨집니다
 - macOS: `secrets/*.enc` — 계정 토큰 (AES-256-GCM, 키는 로그인 키체인의 `Claude Widget` 항목)
 - macOS의 Claude Code는 `.credentials.json` 대신 키체인 `Claude Code-credentials` 항목에 토큰을 저장하므로, 전환 시 그 항목을 바꿉니다 (백업은 `~/.claude.json`만, 토큰을 평문 파일로 꺼내지 않음)

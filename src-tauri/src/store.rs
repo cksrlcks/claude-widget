@@ -20,6 +20,8 @@ pub struct Profile {
     pub custom_avatar: Option<String>,
     pub label: String,
     pub last_usage: Option<Value>,
+    /// last_usage를 확인한 시각(ms)
+    pub last_usage_at: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -103,16 +105,42 @@ fn store_path() -> PathBuf {
 }
 
 impl Store {
+    /// 읽기·파싱에 실패하면 기본값. 파일이 있는데 실패한 거면 덮어쓰기 전에 store.json.bad로 남겨 복구할 수 있게 함
     pub fn load() -> Store {
-        fs::read_to_string(store_path()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        let path = store_path();
+        if !path.exists() {
+            return Store::default();
+        }
+        let parsed = fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|s| serde_json::from_str(&s).map_err(|e| e.to_string()));
+        parsed.unwrap_or_else(|e| {
+            log(&format!("store.json 읽기 실패, store.json.bad로 보관: {e}"));
+            let _ = fs::rename(&path, path.with_extension("json.bad"));
+            Store::default()
+        })
     }
 
     pub fn save(&self) {
         let _ = fs::create_dir_all(data_dir());
-        if let Ok(s) = serde_json::to_string_pretty(self) {
-            let _ = fs::write(store_path(), s);
+        let r = serde_json::to_value(self).map_err(|e| e.to_string()).and_then(|v| crate::claude::write_json_atomic(&store_path(), &v));
+        if let Err(e) = r {
+            log(&format!("store.json 저장 실패: {e}"));
         }
     }
+}
+
+/// 오류 기록: <data_dir>/widget.log (1MB 넘으면 widget.log.1로 넘기고 새로 시작). 시각은 UTC
+pub fn log(msg: &str) {
+    let path = data_dir().join("widget.log");
+    if fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false) {
+        let _ = fs::rename(&path, path.with_extension("log.1"));
+    }
+    let t = time::OffsetDateTime::now_utc();
+    let line = format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}Z {}\n",
+        t.year(), t.month() as u8, t.day(), t.hour(), t.minute(), t.second(), msg
+    );
+    let _ = fs::create_dir_all(data_dir());
+    let _ = fs::OpenOptions::new().create(true).append(true).open(&path).and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
 }
 
 fn secret_path(id: &str, ext: &str) -> PathBuf {
@@ -135,6 +163,31 @@ pub fn load_secret(id: &str) -> Option<Value> {
 pub fn delete_secret(id: &str) {
     let _ = fs::remove_file(secret_path(id, crypto::SECRET_EXT));
     let _ = fs::remove_file(secret_path(id, "bin"));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{data_dir, Profile, Store};
+
+    #[test]
+    fn broken_store_is_kept_and_save_round_trips() {
+        let dir = std::env::temp_dir().join("cw-store-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::env::set_var("APPDATA", &dir); // Windows data_dir
+        std::env::set_var("HOME", &dir); // macOS data_dir (~/Library/…)
+        std::fs::create_dir_all(data_dir()).unwrap();
+        std::fs::write(data_dir().join("store.json"), "{ not json").unwrap();
+
+        assert!(Store::load().profiles.is_empty());
+        assert!(data_dir().join("store.json.bad").exists());
+        assert!(std::fs::read_to_string(data_dir().join("widget.log")).unwrap().contains("store.json 읽기 실패"));
+
+        let mut s = Store::default();
+        s.profiles.push(Profile { id: "x".into(), plan: "max".into(), ..Default::default() });
+        s.save();
+        assert_eq!(Store::load().profiles[0].plan, "max");
+        assert!(!data_dir().join("store.widget-tmp").exists());
+    }
 }
 
 /// Electron 버전이 남긴 secrets/*.bin을 DPAPI(.dpapi)로 복사 (.bin은 Electron 버전으로 돌아갈 때를 위해 남김)

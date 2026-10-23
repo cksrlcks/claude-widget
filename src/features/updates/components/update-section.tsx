@@ -1,4 +1,4 @@
-import { Download, RefreshCw } from "lucide-react"
+import { Download, FolderOpen, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ClaudeCodeUpdate } from "@/features/updates/components/claude-code-update"
@@ -87,6 +87,17 @@ export function UpdateSection({ update: u, className }: Props) {
         )}
       </div>
       <ClaudeCodeUpdate />
+      <div className="bg-card flex items-center gap-3 rounded-[10px] border p-3.5">
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <div className="font-semibold">문제가 생기면</div>
+          <div className="text-muted-foreground text-xs">
+            로그 폴더의 <code>widget.log</code>를 보내 주세요. 오류·전환 기록이 남습니다 (토큰은 기록되지 않음)
+          </div>
+        </div>
+        <Button variant="secondary" onClick={() => api.openLogs()}>
+          <FolderOpen /> 로그 폴더 열기
+        </Button>
+      </div>
     </Section>
   )
 }

@@ -21,6 +21,8 @@ export type Profile = {
   customAvatar: string | null
   label: string
   lastUsage: Usage | null
+  /** lastUsage를 확인한 시각(ms) */
+  lastUsageAt: number | null
 }
 
 export type ProfilePatch = Partial<Pick<Profile, "avatar" | "customAvatar" | "label">>

@@ -31,6 +31,7 @@ export function ProfileCard({ profile: p, active, className }: Props) {
   }
 
   const used = p.lastUsage?.session ? Math.round(p.lastUsage.session.used) : null
+  const checkedAt = p.lastUsageAt ? new Date(p.lastUsageAt).toLocaleString() : null
 
   return (
     <div
@@ -55,7 +56,10 @@ export function ProfileCard({ profile: p, active, className }: Props) {
             <div className="text-destructive mt-0.5 text-[11px]">로그인이 만료됐어요 · 다시 로그인해 주세요</div>
           )}
         </div>
-        <div className="w-[84px] shrink-0" title="마지막으로 확인한 세션 사용량">
+        <div
+          className="w-[84px] shrink-0"
+          title={checkedAt ? `세션 사용량 · ${checkedAt} 확인` : "세션 사용량 · 아직 확인하지 않음"}
+        >
           <div className="text-muted-foreground flex justify-between text-[10.5px]">
             <span>세션</span>
             <span className="tabular-nums">{used === null ? "—" : `${used}%`}</span>

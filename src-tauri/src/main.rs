@@ -160,17 +160,24 @@ fn profile_from_auth(live: &Value, existing: Option<&Profile>, all: &[Profile]) 
     let avatar = existing.map(|e| e.avatar.clone()).filter(|x| !x.is_empty()).unwrap_or_else(|| {
         AVATAR_KEYS.iter().find(|k| !all.iter().any(|p| p.avatar == **k)).unwrap_or(&"a1").to_string()
     });
+    // oauth.subscriptionType은 로그인 시점 값이라 요금제를 바꿔도 그대로("pro") → Claude Code가 주기적으로 갱신하는
+    // oauthAccount.organizationType("claude_max" 등)을 우선 사용
+    let plan = match a["organizationType"].as_str() {
+        Some(t) if !t.is_empty() => t.trim_start_matches("claude_").to_string(),
+        _ => s(&o["subscriptionType"]),
+    };
     Profile {
         id: s(&live["accountUuid"]),
         email,
         display_name: display,
         org_name: s(&a["organizationName"]),
-        plan: s(&o["subscriptionType"]),
+        plan,
         refresh_expires_at: o["refreshTokenExpiresAt"].as_f64(),
         avatar,
         custom_avatar: existing.and_then(|e| e.custom_avatar.clone()),
         label: existing.map(|e| e.label.clone()).unwrap_or_default(),
         last_usage: existing.and_then(|e| e.last_usage.clone()),
+        last_usage_at: existing.and_then(|e| e.last_usage_at),
     }
 }
 
@@ -188,13 +195,16 @@ fn sync_live_auth(app: &AppHandle) -> Option<Value> {
     }
     let live = live?;
     let id = live["accountUuid"].as_str()?.to_string();
-    let _ = store::save_secret(
+    let saved = store::save_secret(
         &id,
         &json!({
             "accountUuid": id, "oauth": live["oauth"],
             "organizationUuid": live["organizationUuid"], "oauthAccount": live["oauthAccount"],
         }),
     );
+    if let Err(e) = saved {
+        store::log(&format!("토큰 저장 실패 ({id}): {e}"));
+    }
     let mut s = st.store.lock().unwrap();
     let existing = s.profiles.iter().find(|p| p.id == id).cloned();
     let meta = profile_from_auth(&live, existing.as_ref(), &s.profiles);
@@ -239,6 +249,10 @@ async fn refresh_status(app: AppHandle, force: bool) {
                 rt.usage_fetched_at = claude::now_ms();
             }
             Err(e) => {
+                // 같은 오류가 3분마다 반복되므로 바뀔 때만 기록
+                if rt.usage_error.as_ref() != Some(&e) {
+                    store::log(&format!("사용량 조회 실패: {e}"));
+                }
                 rt.usage_error = Some(e);
                 let cached = &live["cachedUsage"];
                 if cached["accountUuid"].as_str() == Some(id.as_str()) {
@@ -259,16 +273,52 @@ async fn refresh_status(app: AppHandle, force: bool) {
     }
     {
         let st = state(&app);
-        let usage = st.rt.lock().unwrap().usage.clone();
+        let (usage, live_at) = {
+            let rt = st.rt.lock().unwrap();
+            // 캐시·저장값으로 떨어진 경우는 확인 시각을 갱신하지 않음
+            (rt.usage.clone(), (rt.usage_source.as_deref() == Some("live")).then_some(rt.usage_fetched_at))
+        };
         if !usage.is_null() {
             let mut s = st.store.lock().unwrap();
             if let Some(p) = s.profiles.iter_mut().find(|p| p.id == id) {
                 p.last_usage = Some(usage);
+                p.last_usage_at = live_at.or(p.last_usage_at);
             }
             s.save();
         }
     }
     broadcast(&app);
+}
+
+// 지금 쓰지 않는 계정들의 사용량도 저장된 토큰으로 조회 (설정 > 계정 목록의 새로고침).
+// shortcut: 저장된 액세스 토큰이 만료(약 8시간)됐으면 건너뜀 — 그 계정으로 전환할 때 Claude Code가 갱신함. 리프레시 토큰으로 직접 갱신하려면 OAuth 토큰 엔드포인트 호출이 필요
+async fn refresh_others(app: &AppHandle) {
+    let (active, ids) = {
+        let st = state(app);
+        let active = st.rt.lock().unwrap().active_id.clone();
+        let ids: Vec<String> = st.store.lock().unwrap().profiles.iter().map(|p| p.id.clone()).collect();
+        (active, ids)
+    };
+    for id in ids.into_iter().filter(|i| Some(i) != active.as_ref()) {
+        let Some(secret) = store::load_secret(&id) else { continue };
+        let oauth = &secret["oauth"];
+        if oauth["expiresAt"].as_f64().is_some_and(|t| t < claude::now_ms()) {
+            continue;
+        }
+        match claude::fetch_usage(oauth["accessToken"].as_str().unwrap_or("")).await {
+            Ok(u) => {
+                let st = state(app);
+                let mut s = st.store.lock().unwrap();
+                if let Some(p) = s.profiles.iter_mut().find(|p| p.id == id) {
+                    p.last_usage = Some(claude::summarize_usage(&u));
+                    p.last_usage_at = Some(claude::now_ms());
+                }
+                s.save();
+            }
+            Err(e) => store::log(&format!("저장된 계정 사용량 조회 실패 ({id}): {e}")),
+        }
+    }
+    broadcast(app);
 }
 
 async fn check_integrations(app: AppHandle) {
@@ -286,6 +336,9 @@ async fn check_integrations(app: AppHandle) {
         let st = state(&app);
         if let Ok(result) = result {
             let mut s = st.store.lock().unwrap();
+            if result.error.is_some() && result.error != s.last_integrations.as_ref().and_then(|r| r.error.clone()) {
+                store::log(&format!("MCP 상태 확인 실패: {}", result.error.as_deref().unwrap_or("")));
+            }
             for i in &result.items {
                 if !s.known_integrations.iter().any(|k| k.key == i.key) {
                     s.known_integrations.push(Integration { status: None, status_text: None, ..i.clone() });
@@ -338,6 +391,7 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
     }
 
     if let Err(e) = apply_switch(&app, &target).await {
+        store::log(&format!("계정 전환 실패 ({}): {e}", meta.email));
         app.dialog().message(e).title("전환 실패").kind(MessageDialogKind::Error).blocking_show();
         return false;
     }
@@ -377,8 +431,9 @@ fn parse_switch(args: &[String]) -> Option<SwitchRequest> {
     })
 }
 
+// remote-switch.log는 /switch 명령이 결과 한 줄을 읽어 가는 파일, widget.log에도 함께 남김
 fn remote_log(msg: &str) {
-    let _ = std::fs::create_dir_all(store::data_dir());
+    store::log(&format!("원격 전환: {msg}"));
     let _ = std::fs::write(store::data_dir().join("remote-switch.log"), format!("{} {msg}\n", claude::now_ms() as u64));
 }
 
@@ -809,10 +864,21 @@ fn get_state(app: AppHandle) -> Value {
     build_state(&app)
 }
 
+/// 모든 계정의 사용량을 지금 다시 확인 (설정 > 계정의 새로고침)
 #[tauri::command]
 async fn refresh(app: AppHandle) {
     refresh_status(app.clone(), true).await;
-    spawn_check(&app);
+    refresh_others(&app).await;
+}
+
+#[tauri::command]
+fn open_logs(app: AppHandle) {
+    let _ = app.opener().open_path(store::data_dir().to_string_lossy(), None::<&str>);
+}
+
+#[tauri::command]
+fn log_frontend(msg: String) {
+    store::log(&format!("화면 오류: {}", msg.chars().take(2000).collect::<String>()));
 }
 
 #[tauri::command]
@@ -1111,6 +1177,9 @@ fn main() {
     if parse_switch(&args).is_none() {
         claude::fix_path_env();
     }
+    // 릴리스는 panic = "abort"라 창 없이 그냥 사라짐 → 원인을 로그에 남김
+    std::panic::set_hook(Box::new(|info| store::log(&format!("패닉: {info}"))));
+    store::log(&format!("시작 v{}", env!("CARGO_PKG_VERSION")));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -1147,6 +1216,8 @@ fn main() {
             get_state,
             refresh,
             recheck,
+            open_logs,
+            log_frontend,
             open_settings_cmd,
             open_store_cmd,
             switch_account_cmd,
@@ -1255,6 +1326,16 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::parse_switch;
+
+    #[test]
+    fn plan_prefers_fresh_organization_type() {
+        use serde_json::json;
+        // 요금제를 바꾸면 oauth.subscriptionType은 옛값("pro")으로 남고 oauthAccount.organizationType만 갱신됨
+        let live = json!({ "accountUuid": "u", "oauth": { "subscriptionType": "pro" }, "oauthAccount": { "organizationType": "claude_max" } });
+        assert_eq!(super::profile_from_auth(&live, None, &[]).plan, "max");
+        let old = json!({ "accountUuid": "u", "oauth": { "subscriptionType": "pro" }, "oauthAccount": {} });
+        assert_eq!(super::profile_from_auth(&old, None, &[]).plan, "pro");
+    }
 
     #[test]
     fn parses_switch_args() {

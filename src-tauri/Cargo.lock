@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "claude-widget"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -570,6 +570,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "time",
  "tokio",
  "windows-sys 0.59.0",
 ]

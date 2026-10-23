@@ -62,7 +62,12 @@ pub async fn check(app: AppHandle) {
                 }))
             }
             Ok(None) => u.available = None,
-            Err(e) => u.error = Some(e),
+            Err(e) => {
+                if u.error.as_ref() != Some(&e) {
+                    crate::store::log(&format!("업데이트 확인 실패: {e}"));
+                }
+                u.error = Some(e);
+            }
         }
         u.checking = false;
         u.checked_at = Some(now_ms());
@@ -115,6 +120,7 @@ pub async fn install(app: AppHandle) {
         // Windows에서는 보통 여기까지 오기 전에 설치 프로그램이 앱을 종료함
         Ok(()) => app.restart(),
         Err(e) => {
+            crate::store::log(&format!("업데이트 설치 실패: {e}"));
             let mut u = update_state(&app).lock().unwrap();
             u.installing = false;
             u.progress = None;
