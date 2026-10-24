@@ -28,7 +28,7 @@ use tauri_plugin_opener::OpenerExt;
 
 // 새 계정에 아직 안 쓴 아바타부터 배정 (src/shared/lib/pixel-sprites.ts의 키와 맞춤)
 const AVATAR_KEYS: [&str; 8] = ["a1", "slime", "ghost", "cat", "frog", "chick", "bunny", "dino"];
-const FULL_W: f64 = 236.0;
+const FULL_W: f64 = 264.0;
 const MINI: f64 = 60.0;
 
 struct Runtime {

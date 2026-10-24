@@ -1,8 +1,9 @@
-import { ArrowUpCircle, Minimize2, Settings } from "lucide-react"
+import { ArrowUpCircle, Minimize2, RefreshCw, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { api } from "@/shared/api/commands"
+import { useRefreshUsage } from "@/shared/api/mutations"
 import { ProfileAvatar } from "@/shared/components/profile-avatar"
 import type { Profile } from "@/shared/types"
 
@@ -17,6 +18,7 @@ type Props = {
 }
 
 export function AccountHeader({ profile, onMinimize, animated, updateVersion, className }: Props) {
+  const refresh = useRefreshUsage()
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <ProfileAvatar profile={profile} animated={animated} className="ring-foreground/10 size-[34px] ring-2" />
@@ -29,6 +31,19 @@ export function AccountHeader({ profile, onMinimize, animated, updateVersion, cl
         </div>
       </div>
       <div className="-mr-1 flex shrink-0 items-center">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          title="사용량·MCP 상태 지금 다시 확인"
+          disabled={refresh.isPending}
+          onClick={() => {
+            refresh.mutate()
+            api.recheck()
+          }}
+        >
+          <RefreshCw className={refresh.isPending ? "animate-spin" : undefined} />
+        </Button>
         {updateVersion && (
           <Button
             variant="ghost"
