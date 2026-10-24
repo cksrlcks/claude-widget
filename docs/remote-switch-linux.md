@@ -3,6 +3,8 @@
 Claude Widget은 Windows 전용(DPAPI, 트레이, 콘솔 창)이라 리눅스 서버·WSL에서 Claude Code를 쓰는 경우에는 `/switch`를 쓸 수 없습니다.
 위젯이 Windows에서 하는 일을 리눅스에서 어떻게 재현할 수 있는지 정리합니다. 2026-10-24 기준, 실제 리눅스에서 돌려 본 것은 아닙니다.
 
+> **구현:** [linux/](../linux/README.md) — tmux 없이 `claude remote-control --session-id <세션>`(2.1.303의 서버 모드 하위 명령, 도움말에 "물어볼 터미널이 없을 때"를 전제한 안내가 있음)으로 재실행하는 python3 버전. 2026-10-24, 실서버 미검증. 아래는 그 전의 탐구 노트이고 [scripts/claude-switch.sh](../scripts/claude-switch.sh)는 tmux가 있을 때의 bash 초안으로 남겨 둠.
+
 ## 위젯이 하는 일 (리눅스로 옮겨야 할 것)
 
 | 단계 | Windows 위젯 | 리눅스에서 대응 |

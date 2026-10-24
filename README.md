@@ -79,7 +79,7 @@ Windows·macOS 화면에 떠 있는 Claude Code 상태 위젯. 사용량을 보�
 
 세션 ID를 안 주면 현재 폴더 프로젝트에서 가장 최근 세션을 씁니다. 결과는 데이터 폴더의 `remote-switch.log`에 남습니다.
 
-리눅스 서버·WSL에서 Claude Code를 쓰는 경우는 위젯이 닿지 않습니다 → [리눅스에서의 방법 탐구](docs/remote-switch-linux.md)
+리눅스 서버·WSL에서 Claude Code를 쓰는 경우는 위젯이 닿지 않습니다 → [리눅스 서버용 /switch](linux/README.md) (배경: [탐구 노트](docs/remote-switch-linux.md))
 
 </details>
 
