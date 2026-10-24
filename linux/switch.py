@@ -246,6 +246,10 @@ def main(args):
                     + ", ".join("%s (%s)" % (l, p["email"]) for l, p in sorted(profs.items())))
 
     cwd = os.getcwd()
+    # claude remote-control은 홈 디렉터리를 신뢰 폴더로 저장하지 않아 재실행을 거부함 → 죽이기 전에 막음
+    if os.path.realpath(cwd) == os.path.realpath(os.path.expanduser("~")):
+        return fail("홈 디렉터리에서는 전환할 수 없습니다 (재실행되는 claude remote-control이 홈 디렉터리를 거부). "
+                    "프로젝트 폴더에서 claude를 실행한 뒤 /switch 하세요")
     procs = claude_ancestors(os.getppid())
     session = newest_session(cwd)
     if not procs or not session:

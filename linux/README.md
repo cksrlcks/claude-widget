@@ -16,6 +16,9 @@ cp switch.py ~/.claude/switch.py && mkdir -p ~/.claude/commands && cp switch.md 
 
 ## 사용
 
+**프로젝트 폴더에서 `claude`를 실행한 상태여야 한다.** 홈 디렉터리에서는 안 된다: 재실행되는 `claude remote-control`이
+홈 디렉터리를 신뢰 폴더로 저장하지 않아 거부하고, 그러면 이전 계정으로 롤백된다. 처음 쓰는 폴더면 `claude`를 한 번 실행해 신뢰 질문에 답해 둔다.
+
 - `/switch work` : work 계정으로 전환. 계정이 둘이면 `/switch` 만으로 다른 쪽
 - `/switch --list` : 저장된 계정
 - 전환하면 5초 뒤 이 세션의 claude가 종료되고 `claude remote-control --session-id <세션>` 으로 새 계정에서 백그라운드 재실행된다.
