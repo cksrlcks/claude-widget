@@ -181,10 +181,38 @@ fn profile_from_auth(live: &Value, existing: Option<&Profile>, all: &[Profile]) 
     }
 }
 
+/// 실행 중인 세션이 .claude.json을 되쓰면 토큰(.credentials.json)과 계정(oauthAccount)이 어긋남.
+/// 그대로 저장하면 다른 계정 토큰이 이 계정 이름으로 저장돼 계정끼리 섞이므로, 토큰이 바뀌었으면 주인을 확인하고
+/// 다르면 .claude.json을 토큰 주인으로 맞춤. None: 주인이 위젯에 없는 계정이라 믿을 수 없음
+async fn verify_live(app: &AppHandle, live: Value) -> Option<Value> {
+    let id = live["accountUuid"].as_str()?.to_string();
+    let rt = live["oauth"]["refreshToken"].clone();
+    if store::load_secret(&id).is_some_and(|s| s["oauth"]["refreshToken"] == rt) {
+        return Some(live);
+    }
+    let others: Vec<String> = state(app).store.lock().unwrap().profiles.iter().map(|p| p.id.clone()).filter(|p| *p != id).collect();
+    let owner = match claude::fetch_owner(live["oauth"]["accessToken"].as_str().unwrap_or("")).await {
+        Ok(o) => o,
+        // 만료·오프라인으로 확인 못 하면 다른 계정에 저장된 토큰과 똑같은지만 봄
+        Err(_) => others.into_iter().find(|p| store::load_secret(p).is_some_and(|s| s["oauth"]["refreshToken"] == rt)).unwrap_or(id.clone()),
+    };
+    if owner == id {
+        return Some(live);
+    }
+    let mut fixed = store::load_secret(&owner)?;
+    fixed["oauth"] = live["oauth"].clone();
+    fixed["organizationUuid"] = fixed["oauthAccount"]["organizationUuid"].clone();
+    claude::apply_auth(&fixed).ok()?;
+    claude::read_live_auth()
+}
+
 // 현재 로그인 계정을 읽어 프로필과 동기화. 토큰이 갱신(회전)됐을 수 있어 매번 덮어쓴다
-fn sync_live_auth(app: &AppHandle) -> Option<Value> {
+async fn sync_live_auth(app: &AppHandle) -> Option<Value> {
+    let live = match claude::read_live_auth() {
+        Some(l) => verify_live(app, l).await,
+        None => None,
+    };
     let st = state(app);
-    let live = claude::read_live_auth();
     {
         let mut rt = st.rt.lock().unwrap();
         rt.logged_in = live.is_some();
@@ -217,7 +245,7 @@ fn sync_live_auth(app: &AppHandle) -> Option<Value> {
 }
 
 async fn refresh_status(app: AppHandle, force: bool) {
-    let Some(live) = sync_live_auth(&app) else {
+    let Some(live) = sync_live_auth(&app).await else {
         let st = state(&app);
         let mut rt = st.rt.lock().unwrap();
         rt.usage = Value::Null;
@@ -362,9 +390,8 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
     if state(&app).rt.lock().unwrap().active_id.as_deref() == Some(id.as_str()) {
         return true;
     }
-    let target = store::load_secret(&id);
     let meta = state(&app).store.lock().unwrap().profiles.iter().find(|p| p.id == id).cloned();
-    let (Some(target), Some(meta)) = (target, meta) else {
+    let (Some(_), Some(meta)) = (store::load_secret(&id), meta) else {
         app.dialog()
             .message("저장된 계정 정보가 없습니다. 해당 계정으로 다시 로그인해 주세요.")
             .title("전환 실패")
@@ -390,7 +417,7 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
         }
     }
 
-    if let Err(e) = apply_switch(&app, &target).await {
+    if let Err(e) = apply_switch(&app, &id).await {
         store::log(&format!("계정 전환 실패 ({}): {e}", meta.email));
         app.dialog().message(e).title("전환 실패").kind(MessageDialogKind::Error).blocking_show();
         return false;
@@ -398,10 +425,25 @@ async fn switch_account_inner(app: AppHandle, id: String) -> bool {
     true
 }
 
-async fn apply_switch(app: &AppHandle, target: &Value) -> Result<(), String> {
-    sync_live_auth(app); // 현재 계정의 최신 토큰을 먼저 저장
+async fn apply_switch(app: &AppHandle, id: &str) -> Result<(), String> {
+    sync_live_auth(app).await; // 현재 계정의 최신 토큰을 먼저 저장
+    let mut target = store::load_secret(id).ok_or("저장된 계정 정보 없음")?;
+    // 만료된 토큰을 넣으면 실행 중인 세션들이 같은 리프레시 토큰으로 동시에 갱신하다 충돌해 로그아웃됨 → 미리 갱신
+    if target["oauth"]["expiresAt"].as_f64().is_none_or(|t| t < claude::now_ms() + 300_000.0) {
+        target["oauth"] = claude::refresh_oauth(&target["oauth"]).await?;
+        store::save_secret(id, &target)?; // 회전된 리프레시 토큰은 이것뿐이라 파일에 쓰기 전에 저장
+    }
+    // 예전에 섞여 저장된 토큰이면 넣지 않음 (확인 못 하면 그냥 진행)
+    if claude::fetch_owner(target["oauth"]["accessToken"].as_str().unwrap_or("")).await.is_ok_and(|o| o != id) {
+        return Err("저장된 토큰이 다른 계정 것입니다. 이 계정으로 다시 로그인해 주세요".into());
+    }
     claude::backup_live_files(&store::backup_dir());
-    claude::apply_auth(target)?;
+    claude::apply_auth(&target)?;
+    let written = claude::read_live_auth()
+        .is_some_and(|l| l["accountUuid"] == id && l["oauth"]["accessToken"] == target["oauth"]["accessToken"]);
+    if !written {
+        return Err("전환 후 확인 실패: 다른 프로그램이 로그인 파일을 덮어썼습니다".into());
+    }
     state(app).rt.lock().unwrap().usage_fetched_at = 0.0;
     refresh_status(app.clone(), true).await;
     spawn_check(app);
@@ -466,11 +508,11 @@ async fn remote_switch(app: AppHandle, req: SwitchRequest, cwd: std::path::PathB
 }
 
 async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path::PathBuf) -> Result<(), String> {
-    let prev = sync_live_auth(app).ok_or("현재 로그인 정보 없음")?;
+    let prev = sync_live_auth(app).await.ok_or("현재 로그인 정보 없음")?;
+    let prev = prev["accountUuid"].as_str().unwrap_or("").to_string();
     let meta = if req.profile.is_empty() { other_profile(app)? } else {
         find_profile(app, &req.profile).ok_or(format!("계정 없음: {}", req.profile))?
     };
-    let target = store::load_secret(&meta.id).ok_or("저장된 계정 정보 없음")?;
     let relaunch = req.caller > 0 || req.fork;
     let session = match req.session {
         Some(s) if claude::valid_session_id(&s) => Some(s),
@@ -489,7 +531,7 @@ async fn remote_switch_inner(app: &AppHandle, req: SwitchRequest, cwd: std::path
             meta.email
         ),
     });
-    apply_switch(app, &target).await?;
+    apply_switch(app, &meta.id).await?;
     let Some(session) = session else {
         remote_log(&format!("전환됨: {}", meta.email));
         return Ok(());
@@ -904,9 +946,9 @@ async fn switch_account_cmd(app: AppHandle, id: String) -> bool {
 
 #[tauri::command]
 fn login_new(app: AppHandle) {
-    sync_live_auth(&app);
-    claude::backup_live_files(&store::backup_dir());
     std::thread::spawn(move || {
+        tauri::async_runtime::block_on(sync_live_auth(&app));
+        claude::backup_live_files(&store::backup_dir());
         claude::run_in_terminal("Claude Login", "claude auth login");
         tauri::async_runtime::block_on(refresh_status(app.clone(), true));
         spawn_check(&app);

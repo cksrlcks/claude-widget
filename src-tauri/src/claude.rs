@@ -133,6 +133,59 @@ pub async fn fetch_usage(token: &str) -> Result<Value, String> {
     res.json().await.map_err(|e| e.to_string())
 }
 
+/// 토큰의 실제 주인(accountUuid). 로컬 파일만으로는 토큰과 .claude.json 계정이 짝인지 알 수 없어 서버에 물음
+pub async fn fetch_owner(token: &str) -> Result<String, String> {
+    let res = reqwest::Client::new()
+        .get("https://api.anthropic.com/api/oauth/profile")
+        .bearer_auth(token)
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("profile {}", res.status().as_u16()));
+    }
+    let v: Value = res.json().await.map_err(|e| e.to_string())?;
+    v["account"]["uuid"].as_str().map(String::from).ok_or_else(|| "profile 응답 형식 오류".into())
+}
+
+/// Claude Code의 공개 OAuth client id
+const OAUTH_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+
+/// access token 갱신. 응답의 리프레시 토큰은 회전돼 이전 것은 폐기되므로 호출한 쪽에서 바로 저장해야 함
+pub async fn refresh_oauth(oauth: &Value) -> Result<Value, String> {
+    let body = json!({ "grant_type": "refresh_token", "refresh_token": oauth["refreshToken"], "client_id": OAUTH_CLIENT_ID });
+    let mut last = String::from("토큰 갱신 실패");
+    for url in ["https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/v1/oauth/token"] {
+        let res = match reqwest::Client::new().post(url).json(&body).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                last = e.to_string();
+                continue;
+            }
+        };
+        let status = res.status().as_u16();
+        if matches!(status, 400 | 401) {
+            return Err("저장된 로그인이 만료됐습니다. 이 계정으로 다시 로그인해 주세요".into());
+        }
+        if !res.status().is_success() {
+            last = format!("token {status}");
+            continue;
+        }
+        let t: Value = res.json().await.map_err(|e| e.to_string())?;
+        let mut merged = oauth.clone();
+        merged["accessToken"] = json!(t["access_token"].as_str().ok_or("token 응답 형식 오류")?);
+        if let Some(r) = t["refresh_token"].as_str() {
+            merged["refreshToken"] = json!(r);
+        }
+        if let Some(s) = t["expires_in"].as_f64() {
+            merged["expiresAt"] = json!((now_ms() + s * 1000.0) as u64);
+        }
+        return Ok(merged);
+    }
+    Err(last)
+}
+
 /// 사용량 응답 → 위젯에서 쓰는 형태로 축약
 pub fn summarize_usage(u: &Value) -> Value {
     let pick = |w: &Value| {
